@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
-import { MessageCircle, BookOpen, Calendar, Smile, Frown, Meh, Heart, Sparkles, ArrowRight, Sun, CloudRain, Zap, Coffee } from 'lucide-react';
+import { MessageCircle, BookOpen, Calendar, Smile, Frown, Meh, Heart, Sparkles, ArrowRight, Sun, CloudRain, Zap, Coffee, Crown, Loader2 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
@@ -30,12 +30,39 @@ function getGreeting() {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [moodLogged, setMoodLogged] = useState(false);
   const [recentJournals, setRecentJournals] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [moodInsights, setMoodInsights] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [pollingPayment, setPollingPayment] = useState(false);
+
+  // Handle payment success redirect
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    const payment = searchParams.get('payment');
+    if (sessionId && payment === 'success') {
+      setPollingPayment(true);
+      const pollStatus = async (attempts = 0) => {
+        if (attempts >= 5) { setPollingPayment(false); return; }
+        try {
+          const res = await axios.get(`${API}/subscribe/status/${sessionId}`, { withCredentials: true });
+          if (res.data.payment_status === 'paid') {
+            setPaymentSuccess(true);
+            setPollingPayment(false);
+            checkAuth(); // Refresh user data with new subscription
+            window.history.replaceState({}, '', '/dashboard');
+            return;
+          }
+        } catch (err) { console.error(err); }
+        setTimeout(() => pollStatus(attempts + 1), 2000);
+      };
+      pollStatus();
+    }
+  }, [searchParams, checkAuth]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -77,6 +104,46 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 md:p-8 lg:p-10 max-w-6xl mx-auto" data-testid="dashboard">
+      {/* Payment Success Banner */}
+      {paymentSuccess && (
+        <div className="mb-6 bg-[#10B981]/10 border border-[#10B981]/20 rounded-2xl p-4 flex items-center gap-3 animate-fade-in-up" data-testid="payment-success-banner">
+          <Crown className="w-5 h-5 text-[#10B981]" />
+          <p className="text-sm text-[#10B981] font-medium">Welcome to HEARD Premium! You now have unlimited access to Willow and all features.</p>
+        </div>
+      )}
+
+      {/* Payment Polling */}
+      {pollingPayment && (
+        <div className="mb-6 bg-[#FFB627]/10 border border-[#FFB627]/20 rounded-2xl p-4 flex items-center gap-3" data-testid="payment-polling-banner">
+          <Loader2 className="w-5 h-5 text-[#FFB627] animate-spin" />
+          <p className="text-sm text-[#FFB627] font-medium">Processing your payment...</p>
+        </div>
+      )}
+
+      {/* Subscription Status */}
+      {user?.subscription && !user.subscription.is_premium && !pollingPayment && (
+        <div className="mb-6 bg-gradient-to-r from-[#FF715B]/5 to-[#FFB627]/5 border border-[#FF715B]/10 rounded-2xl p-4 flex items-center justify-between" data-testid="upgrade-banner">
+          <div className="flex items-center gap-3">
+            <Crown className="w-5 h-5 text-[#FF715B]" />
+            <p className="text-sm text-slate-700">Unlock unlimited Willow conversations & all premium features</p>
+          </div>
+          <button onClick={() => navigate('/pricing')} className="text-sm font-medium text-[#FF715B] hover:underline whitespace-nowrap" data-testid="upgrade-link">
+            Upgrade to Premium
+          </button>
+        </div>
+      )}
+
+      {user?.subscription?.status === 'trial' && (
+        <div className="mb-6 bg-[#4E9FE5]/10 border border-[#4E9FE5]/20 rounded-2xl p-4 flex items-center justify-between" data-testid="trial-banner">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-[#4E9FE5]" />
+            <p className="text-sm text-slate-700">Free trial: <strong>{user.subscription.days_left} days left</strong> of full access</p>
+          </div>
+          <button onClick={() => navigate('/pricing')} className="text-sm font-medium text-[#4E9FE5] hover:underline whitespace-nowrap" data-testid="trial-upgrade-link">
+            Keep Premium
+          </button>
+        </div>
+      )}
       {/* Welcome + Mood */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in-up" data-testid="welcome-card">

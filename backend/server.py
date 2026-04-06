@@ -9,9 +9,10 @@ import uuid
 import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timezone, timedelta
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -107,6 +108,55 @@ async def get_current_user(request: Request) -> dict:
     if not user_doc:
         raise HTTPException(status_code=401, detail="User not found")
     return user_doc
+
+# ─── Subscription Helpers ───
+
+MONTHLY_PRICE = 4.99
+FREE_DAILY_CHAT_LIMIT = 3
+TRIAL_DAYS = 7
+
+async def get_subscription_info(user_id: str) -> dict:
+    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        return {"status": "free", "is_premium": False}
+
+    now = datetime.now(timezone.utc)
+
+    # Check trial
+    trial_end = user.get("trial_end")
+    if trial_end:
+        if isinstance(trial_end, str):
+            trial_end = datetime.fromisoformat(trial_end)
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if trial_end > now:
+            days_left = (trial_end - now).days
+            return {"status": "trial", "is_premium": True, "days_left": days_left, "trial_end": trial_end.isoformat()}
+
+    # Check active subscription
+    sub_end = user.get("subscription_end")
+    if sub_end:
+        if isinstance(sub_end, str):
+            sub_end = datetime.fromisoformat(sub_end)
+        if sub_end.tzinfo is None:
+            sub_end = sub_end.replace(tzinfo=timezone.utc)
+        if sub_end > now:
+            days_left = (sub_end - now).days
+            return {"status": "active", "is_premium": True, "days_left": days_left, "subscription_end": sub_end.isoformat()}
+
+    return {"status": "free", "is_premium": False}
+
+
+async def get_daily_chat_count(user_id: str) -> int:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$unwind": "$messages"},
+        {"$match": {"messages.role": "user", "messages.timestamp": {"$regex": f"^{today}"}}},
+        {"$count": "total"}
+    ]
+    result = await db.conversations.aggregate(pipeline).to_list(1)
+    return result[0]["total"] if result else 0
 
 # ─── Willow System Prompt ───
 
@@ -224,7 +274,9 @@ async def exchange_session(body: SessionExchange, response: Response):
             "email": email,
             "name": name,
             "picture": picture,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "trial_end": (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat(),
+            "subscription_status": "trial"
         })
 
     await db.user_sessions.insert_one({
@@ -248,7 +300,8 @@ async def exchange_session(body: SessionExchange, response: Response):
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return user
+    sub_info = await get_subscription_info(user["user_id"])
+    return {**user, "subscription": sub_info}
 
 
 @api_router.post("/auth/logout")
@@ -303,6 +356,16 @@ async def send_chat_message(body: ChatMessageRequest, user: dict = Depends(get_c
     user_id = user["user_id"]
     conversation_id = body.conversation_id
     now = datetime.now(timezone.utc).isoformat()
+
+    # Check subscription / daily limit
+    sub_info = await get_subscription_info(user_id)
+    if not sub_info["is_premium"]:
+        daily_count = await get_daily_chat_count(user_id)
+        if daily_count >= FREE_DAILY_CHAT_LIMIT:
+            raise HTTPException(
+                status_code=403,
+                detail=f"You've used your {FREE_DAILY_CHAT_LIMIT} free messages for today. Upgrade to HEARD Premium for unlimited chats with Willow!"
+            )
 
     if not conversation_id:
         conversation_id = f"conv_{uuid.uuid4().hex[:12]}"
@@ -411,6 +474,11 @@ async def delete_journal_entry(entry_id: str, user: dict = Depends(get_current_u
 
 @api_router.get("/journal/prompts")
 async def get_journal_prompts(user: dict = Depends(get_current_user)):
+    # AI prompts are a premium feature
+    sub_info = await get_subscription_info(user["user_id"])
+    if not sub_info["is_premium"]:
+        raise HTTPException(status_code=403, detail="AI journaling prompts are a premium feature. Upgrade to unlock Willow's personalized prompts!")
+
     # AI-powered prompts based on user context
     user_id = user["user_id"]
     moods = await db.mood_entries.find(
@@ -549,6 +617,128 @@ async def get_mood_insights(user: dict = Depends(get_current_user)):
         "trend": trend,
         "message": messages[trend]
     }
+
+
+# ─── Subscription / Payment Routes ───
+
+class CheckoutRequest(BaseModel):
+    origin_url: str
+
+@api_router.get("/subscribe/info")
+async def get_subscription(user: dict = Depends(get_current_user)):
+    sub_info = await get_subscription_info(user["user_id"])
+    return sub_info
+
+
+@api_router.post("/subscribe/checkout")
+async def create_checkout(body: CheckoutRequest, request: Request, user: dict = Depends(get_current_user)):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+
+    origin = body.origin_url.rstrip("/")
+    success_url = f"{origin}/dashboard?session_id={{CHECKOUT_SESSION_ID}}&payment=success"
+    cancel_url = f"{origin}/pricing"
+
+    checkout_request = CheckoutSessionRequest(
+        amount=MONTHLY_PRICE,
+        currency="usd",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "user_id": user["user_id"],
+            "plan": "monthly",
+            "email": user.get("email", "")
+        }
+    )
+
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+
+    # Create payment transaction record
+    await db.payment_transactions.insert_one({
+        "transaction_id": f"txn_{uuid.uuid4().hex[:12]}",
+        "user_id": user["user_id"],
+        "session_id": session.session_id,
+        "amount": MONTHLY_PRICE,
+        "currency": "usd",
+        "status": "initiated",
+        "payment_status": "pending",
+        "metadata": {"plan": "monthly"},
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {"url": session.url, "session_id": session.session_id}
+
+
+@api_router.get("/subscribe/status/{session_id}")
+async def check_payment_status(session_id: str, request: Request, user: dict = Depends(get_current_user)):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+
+    status = await stripe_checkout.get_checkout_status(session_id)
+
+    # Check if this payment was already processed
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if txn and txn.get("payment_status") != "paid" and status.payment_status == "paid":
+        # First time paid - activate subscription
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": "completed", "payment_status": "paid"}}
+        )
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {
+                "subscription_end": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+                "subscription_status": "active"
+            }}
+        )
+    elif txn and status.payment_status != "paid":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"status": status.status, "payment_status": status.payment_status}}
+        )
+
+    return {"status": status.status, "payment_status": status.payment_status}
+
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    api_key = os.environ.get("STRIPE_API_KEY")
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature")
+
+    try:
+        event = await stripe_checkout.handle_webhook(body, signature)
+        if event.session_id:
+            txn = await db.payment_transactions.find_one({"session_id": event.session_id}, {"_id": 0})
+            if txn and txn.get("payment_status") != "paid" and event.payment_status == "paid":
+                await db.payment_transactions.update_one(
+                    {"session_id": event.session_id},
+                    {"$set": {"status": "completed", "payment_status": "paid"}}
+                )
+                await db.users.update_one(
+                    {"user_id": txn["user_id"]},
+                    {"$set": {
+                        "subscription_end": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+                        "subscription_status": "active"
+                    }}
+                )
+            elif txn:
+                await db.payment_transactions.update_one(
+                    {"session_id": event.session_id},
+                    {"$set": {"status": event.event_type, "payment_status": event.payment_status}}
+                )
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+
+    return {"status": "ok"}
 
 
 # ─── Health Check ───

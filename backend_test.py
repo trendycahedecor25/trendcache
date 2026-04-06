@@ -8,6 +8,7 @@ import requests
 import sys
 import json
 import uuid
+import time
 from datetime import datetime, timezone, timedelta
 from pymongo import MongoClient
 
@@ -51,13 +52,15 @@ class HEARDAPITester:
             self.user_id = f"test-user-{timestamp}"
             self.session_token = f"test_session_{timestamp}"
             
-            # Insert test user
+            # Insert test user with trial access (like new users get)
             user_doc = {
                 "user_id": self.user_id,
                 "email": f"test.user.{timestamp}@example.com",
                 "name": "Test User",
                 "picture": "https://via.placeholder.com/150",
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "trial_end": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                "subscription_status": "trial"
             }
             self.db.users.insert_one(user_doc)
             
@@ -102,19 +105,25 @@ class HEARDAPITester:
         
         try:
             if method == 'GET':
-                response = requests.get(url, headers=headers, timeout=30)
+                response = requests.get(url, headers=headers, timeout=10)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=headers, timeout=30)
+                response = requests.post(url, json=data, headers=headers, timeout=10)
             elif method == 'PUT':
-                response = requests.put(url, json=data, headers=headers, timeout=30)
+                response = requests.put(url, json=data, headers=headers, timeout=10)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, timeout=30)
+                response = requests.delete(url, headers=headers, timeout=10)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
             return response
+        except requests.exceptions.Timeout as e:
+            print(f"❌ Request timeout for {method} {endpoint}: {e}")
+            return None
+        except requests.exceptions.ConnectionError as e:
+            print(f"❌ Connection error for {method} {endpoint}: {e}")
+            return None
         except requests.exceptions.RequestException as e:
-            print(f"❌ Request failed: {e}")
+            print(f"❌ Request failed for {method} {endpoint}: {e}")
             return None
 
     def test_health_check(self):
@@ -285,6 +294,258 @@ class HEARDAPITester:
             self.log_test("Journal Prompts", False, "Failed to get journal prompts",
                          200, response.status_code if response else "No response")
 
+    def test_subscription_info(self):
+        """Test subscription info endpoint"""
+        response = self.make_request('GET', 'subscribe/info')
+        if response and response.status_code == 200:
+            data = response.json()
+            success = 'status' in data and 'is_premium' in data
+            self.log_test("Subscription Info", success,
+                         f"Missing subscription data: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Subscription Info", False, "Failed to get subscription info",
+                         200, response.status_code if response else "No response")
+
+    def test_subscription_checkout(self):
+        """Test Stripe checkout session creation"""
+        checkout_data = {
+            "origin_url": "https://github-explorer-21.preview.emergentagent.com"
+        }
+        response = self.make_request('POST', 'subscribe/checkout', checkout_data)
+        if response and response.status_code == 200:
+            data = response.json()
+            success = 'url' in data and 'session_id' in data and data['url'].startswith('https://checkout.stripe.com')
+            self.log_test("Subscription Checkout", success,
+                         f"Invalid checkout response: {data}" if not success else "",
+                         200, response.status_code)
+            return data.get('session_id')
+        else:
+            self.log_test("Subscription Checkout", False, "Failed to create checkout session",
+                         200, response.status_code if response else "No response")
+            return None
+
+    def test_payment_status(self, session_id):
+        """Test payment status polling"""
+        if not session_id:
+            self.log_test("Payment Status", False, "No session ID provided")
+            return
+        
+        response = self.make_request('GET', f'subscribe/status/{session_id}')
+        if response and response.status_code == 200:
+            data = response.json()
+            success = 'status' in data and 'payment_status' in data
+            self.log_test("Payment Status", success,
+                         f"Missing payment status data: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Payment Status", False, "Failed to get payment status",
+                         200, response.status_code if response else "No response")
+
+    def test_stripe_webhook(self):
+        """Test Stripe webhook endpoint"""
+        # Test webhook with minimal payload (will fail validation but should return 200)
+        webhook_data = {"type": "test"}
+        response = self.make_request('POST', 'webhook/stripe', webhook_data)
+        if response and response.status_code == 200:
+            data = response.json()
+            success = data.get('status') == 'ok'
+            self.log_test("Stripe Webhook", success,
+                         f"Unexpected webhook response: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Stripe Webhook", False, "Failed to call webhook",
+                         200, response.status_code if response else "No response")
+
+    def setup_free_user(self):
+        """Create a free user (no trial, no subscription)"""
+        try:
+            timestamp = int(datetime.now().timestamp())
+            user_id = f"free-user-{timestamp}"
+            session_token = f"free_session_{timestamp}"
+            
+            # Insert free user (no trial_end or subscription_end)
+            user_doc = {
+                "user_id": user_id,
+                "email": f"free.user.{timestamp}@example.com",
+                "name": "Free User",
+                "picture": "https://via.placeholder.com/150",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            self.db.users.insert_one(user_doc)
+            
+            # Insert session
+            session_doc = {
+                "user_id": user_id,
+                "session_token": session_token,
+                "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            self.db.user_sessions.insert_one(session_doc)
+            
+            return user_id, session_token
+        except Exception as e:
+            print(f"❌ Failed to setup free user: {e}")
+            return None, None
+
+    def setup_trial_user(self):
+        """Create a trial user (trial_end in future)"""
+        try:
+            timestamp = int(datetime.now().timestamp())
+            user_id = f"trial-user-{timestamp}"
+            session_token = f"trial_session_{timestamp}"
+            
+            # Insert trial user
+            user_doc = {
+                "user_id": user_id,
+                "email": f"trial.user.{timestamp}@example.com",
+                "name": "Trial User",
+                "picture": "https://via.placeholder.com/150",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "trial_end": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
+                "subscription_status": "trial"
+            }
+            self.db.users.insert_one(user_doc)
+            
+            # Insert session
+            session_doc = {
+                "user_id": user_id,
+                "session_token": session_token,
+                "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            self.db.user_sessions.insert_one(session_doc)
+            
+            return user_id, session_token
+        except Exception as e:
+            print(f"❌ Failed to setup trial user: {e}")
+            return None, None
+
+    def test_free_user_limits_summary(self):
+        """Test free user limits (chat and prompts) - Summary test"""
+        # Based on backend logs, we can see that:
+        # - Free users get 403 on 4th chat message 
+        # - Free users get 403 on journal prompts
+        # The individual tests have connection issues but the functionality works
+        
+        # Quick verification test
+        free_user_id, free_session_token = self.setup_free_user()
+        if not free_user_id:
+            self.log_test("Free User Limits", False, "Failed to create free user")
+            return
+        
+        # Store original session
+        original_session = self.session_token
+        original_user_id = self.user_id
+        
+        try:
+            # Switch to free user
+            self.session_token = free_session_token
+            self.user_id = free_user_id
+            time.sleep(0.5)
+            
+            # Test prompts (should be blocked)
+            response = self.make_request('GET', 'journal/prompts')
+            prompts_blocked = response is not None and response.status_code == 403
+            
+            # Send 3 messages then test 4th
+            chat_success = True
+            for i in range(3):
+                chat_data = {"message": f"Test message {i+1}"}
+                response = self.make_request('POST', 'chat/message', chat_data)
+                if not (response and response.status_code == 200):
+                    chat_success = False
+                    break
+            
+            # Test 4th message (should be blocked)
+            fourth_blocked = False
+            if chat_success:
+                chat_data = {"message": "4th message should fail"}
+                response = self.make_request('POST', 'chat/message', chat_data)
+                fourth_blocked = response is not None and response.status_code == 403
+            
+            # Overall success if both limits work
+            success = prompts_blocked and fourth_blocked and chat_success
+            details = f"Chat 3/3: {chat_success}, Prompts blocked: {prompts_blocked}, 4th chat blocked: {fourth_blocked}"
+            
+            self.log_test("Free User Limits", success, details if not success else "")
+            
+        except Exception as e:
+            self.log_test("Free User Limits", False, f"Exception: {e}")
+        finally:
+            # Cleanup
+            try:
+                self.db.users.delete_many({"user_id": free_user_id})
+                self.db.user_sessions.delete_many({"user_id": free_user_id})
+                self.db.conversations.delete_many({"user_id": free_user_id})
+            except Exception as e:
+                print(f"⚠️ Cleanup warning: {e}")
+            
+            # Restore original session
+            self.session_token = original_session
+            self.user_id = original_user_id
+
+    def test_trial_user_access(self):
+        """Test that trial users have full access"""
+        # Setup trial user
+        trial_user_id, trial_session_token = self.setup_trial_user()
+        if not trial_user_id:
+            self.log_test("Trial User Access Setup", False, "Failed to create trial user")
+            return
+        
+        # Store original session for cleanup
+        original_session = self.session_token
+        original_user_id = self.user_id
+        
+        # Switch to trial user
+        self.session_token = trial_session_token
+        self.user_id = trial_user_id
+        
+        try:
+            # Test prompts access (should work)
+            response = self.make_request('GET', 'journal/prompts')
+            if response and response.status_code == 200:
+                self.log_test("Trial User Prompts Access", True, "Trial user can access prompts")
+            else:
+                self.log_test("Trial User Prompts Access", False, "Trial user should access prompts",
+                             200, response.status_code if response else "No response")
+            
+            # Test unlimited chat (send 5 messages, should all work)
+            success_count = 0
+            for i in range(5):
+                chat_data = {"message": f"Trial test message {i+1}"}
+                response = self.make_request('POST', 'chat/message', chat_data)
+                if response and response.status_code == 200:
+                    success_count += 1
+            
+            if success_count == 5:
+                self.log_test("Trial User Unlimited Chat", True, "Trial user can send unlimited messages")
+            else:
+                self.log_test("Trial User Unlimited Chat", False, f"Only {success_count}/5 messages sent")
+        
+        finally:
+            # Cleanup trial user
+            self.db.users.delete_many({"user_id": trial_user_id})
+            self.db.user_sessions.delete_many({"user_id": trial_user_id})
+            self.db.conversations.delete_many({"user_id": trial_user_id})
+            
+            # Restore original session
+            self.session_token = original_session
+            self.user_id = original_user_id
+
+    def test_auth_me_subscription(self):
+        """Test that auth/me returns subscription info"""
+        response = self.make_request('GET', 'auth/me')
+        if response and response.status_code == 200:
+            data = response.json()
+            success = 'subscription' in data and 'status' in data.get('subscription', {})
+            self.log_test("Auth Me Subscription", success,
+                         f"Missing subscription in auth/me: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Auth Me Subscription", False, "Failed to get user info with subscription",
+                         200, response.status_code if response else "No response")
+
     def test_calendar_functionality(self):
         """Test calendar CRUD operations"""
         # Test creating calendar event
@@ -357,6 +618,19 @@ class HEARDAPITester:
             # Run tests in order
             self.test_health_check()
             self.test_auth_me()
+            self.test_auth_me_subscription()
+            self.test_subscription_info()
+            
+            # Test subscription features
+            session_id = self.test_subscription_checkout()
+            self.test_payment_status(session_id)
+            self.test_stripe_webhook()
+            
+            # Test user limits
+            self.test_free_user_limits_summary()
+            self.test_trial_user_access()
+            
+            # Test core functionality
             self.test_mood_logging()
             self.test_mood_insights()
             self.test_chat_functionality()

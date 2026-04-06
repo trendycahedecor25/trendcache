@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, BookOpen, Sparkles, Trash2, X, Loader2 } from 'lucide-react';
+import { Plus, BookOpen, Sparkles, Trash2, X, Loader2, Crown } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -19,6 +20,8 @@ export default function Journal() {
   const [prompts, setPrompts] = useState([]);
   const [loadingPrompts, setLoadingPrompts] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [promptsLocked, setPromptsLocked] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadEntries();
@@ -55,7 +58,13 @@ export default function Journal() {
     try {
       const res = await axios.get(`${API}/journal/prompts`, { withCredentials: true });
       setPrompts(res.data.prompts || []);
-    } catch (err) { console.error(err); }
+      setPromptsLocked(false);
+    } catch (err) {
+      if (err.response?.status === 403) {
+        setPromptsLocked(true);
+      }
+      console.error(err);
+    }
     finally { setLoadingPrompts(false); }
   };
 
@@ -86,6 +95,22 @@ export default function Journal() {
           </button>
         </div>
       </div>
+
+      {/* AI Prompts or Upgrade Banner */}
+      {promptsLocked && (
+        <div className="mb-6 bg-gradient-to-r from-[#FFB627]/5 to-[#FF715B]/5 rounded-3xl p-5 border border-[#FFB627]/10 animate-fade-in-up flex items-center justify-between" data-testid="prompts-locked-banner">
+          <div className="flex items-center gap-3">
+            <Crown className="w-5 h-5 text-[#FFB627]" />
+            <div>
+              <p className="text-sm font-medium text-slate-800">AI Prompts are a Premium Feature</p>
+              <p className="text-xs text-slate-500">Upgrade to get personalized journaling prompts from Willow</p>
+            </div>
+          </div>
+          <button onClick={() => navigate('/pricing')} className="bg-[#FFB627] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#F0A820] transition-all whitespace-nowrap" data-testid="journal-upgrade-btn">
+            Upgrade
+          </button>
+        </div>
+      )}
 
       {/* AI Prompts */}
       {prompts.length > 0 && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Send, Plus, MessageCircle, Loader2, ChevronLeft } from 'lucide-react';
+import { Send, Plus, MessageCircle, Loader2, ChevronLeft, Crown } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
@@ -51,6 +51,7 @@ export default function WillowChat() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const messagesEndRef = useRef(null);
   const hasInitSent = useRef(false);
 
@@ -111,7 +112,12 @@ export default function WillowChat() {
       setConversations(convRes.data);
     } catch (err) {
       console.error('Chat error:', err);
-      setMessages((prev) => [...prev, { role: 'assistant', content: "I'm sorry, I had a moment there. Could you try again?", timestamp: new Date().toISOString() }]);
+      if (err.response?.status === 403) {
+        setLimitReached(true);
+        setMessages((prev) => prev.slice(0, -1)); // Remove optimistic user message
+      } else {
+        setMessages((prev) => [...prev, { role: 'assistant', content: "I'm sorry, I had a moment there. Could you try again?", timestamp: new Date().toISOString() }]);
+      }
     } finally {
       setSending(false);
     }
@@ -216,10 +222,28 @@ export default function WillowChat() {
 
         {/* Input */}
         <div className="p-4 pb-6 border-t border-slate-100 bg-white relative z-50" data-testid="chat-input-area">
-          <form
-            onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
-            className="flex items-center gap-3 bg-slate-50 rounded-2xl px-4 py-2"
-          >
+          {limitReached ? (
+            <div className="flex items-center justify-between bg-gradient-to-r from-[#FF715B]/5 to-[#FFB627]/5 rounded-2xl px-5 py-4 border border-[#FF715B]/10" data-testid="chat-limit-banner">
+              <div className="flex items-center gap-3">
+                <Crown className="w-5 h-5 text-[#FF715B]" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">You've used your free messages for today</p>
+                  <p className="text-xs text-slate-500">Upgrade to keep talking with Willow</p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/pricing')}
+                className="bg-[#FF715B] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#FF573D] transition-all whitespace-nowrap"
+                data-testid="chat-upgrade-btn"
+              >
+                Upgrade
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+              className="flex items-center gap-3 bg-slate-50 rounded-2xl px-4 py-2"
+            >
             <input
               type="text"
               value={input}
@@ -238,6 +262,7 @@ export default function WillowChat() {
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </form>
+          )}
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import Dashboard from "@/components/Dashboard";
 import WillowChat from "@/components/WillowChat";
 import Journal from "@/components/Journal";
 import CalendarView from "@/components/CalendarView";
+import PricingPage from "@/components/PricingPage";
 import { Loader2 } from "lucide-react";
 
 function LoadingScreen() {
@@ -45,6 +46,7 @@ function AppRouter() {
       <Route path="/chat/:conversationId" element={<ProtectedRoute><WillowChat /></ProtectedRoute>} />
       <Route path="/journal" element={<ProtectedRoute><Journal /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />
+      <Route path="/pricing" element={<ProtectedRoute><PricingPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
