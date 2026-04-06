@@ -221,7 +221,7 @@ export default function WillowChat() {
         </div>
 
         {/* Input */}
-        <div className="p-4 pb-6 border-t border-slate-100 bg-white relative z-50" data-testid="chat-input-area">
+        <div className="p-4 pb-14 border-t border-slate-100 bg-white relative z-50" data-testid="chat-input-area">
           {limitReached ? (
             <div className="flex items-center justify-between bg-gradient-to-r from-[#FF715B]/5 to-[#FFB627]/5 rounded-2xl px-5 py-4 border border-[#FF715B]/10" data-testid="chat-limit-banner">
               <div className="flex items-center gap-3">

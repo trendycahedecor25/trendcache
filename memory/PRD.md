@@ -32,6 +32,15 @@ Build "HEARD" - an AI-powered webapp for overwhelmed mothers who lack support sy
 - Mood tracking with 5-point scale, trend analysis, insights
 - Responsive design with sidebar (desktop) and bottom nav (mobile)
 - Willow's system prompt crafted for empathetic, mom-specific support
+- **Stripe Subscription** ($4.99/month) with:
+  - 7-day free trial for new users
+  - Free tier: 3 Willow messages/day, basic journal, calendar
+  - Premium: unlimited Willow, AI prompts, full mood insights
+  - Stripe checkout via emergentintegrations library
+  - Payment status polling on success redirect
+  - Webhook handler for payment events
+  - Pricing page with plan comparison and FAQ
+  - Upgrade prompts in chat, journal, and dashboard
 
 ## Testing Status
 - Backend: 100% (16/16 tests passed)
