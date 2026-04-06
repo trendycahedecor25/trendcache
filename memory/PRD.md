@@ -41,10 +41,26 @@ Build "HEARD" - an AI-powered webapp for overwhelmed mothers who lack support sy
   - Webhook handler for payment events
   - Pricing page with plan comparison and FAQ
   - Upgrade prompts in chat, journal, and dashboard
+- **Referral Program** ("Share HEARD, Get a Free Month"):
+  - Unique referral code per user (auto-generated on signup)
+  - Shareable link captures ?ref= parameter
+  - Both referrer and new user get 30 days free Premium
+  - Referral tracking with history and stats
+  - Native Web Share API support + clipboard copy
+  - Dashboard referral widget with stats and share button
+- **Admin Analytics Dashboard** (/admin):
+  - Real-time user counts (total, trial, premium, free)
+  - Growth metrics (new today/week/month)
+  - Revenue tracking (total, transactions)
+  - Referral stats (total, this month, top referrers)
+  - Engagement metrics (conversations, journal entries, mood check-ins, events)
+  - Recent signups list with subscription status
+  - Top referrers leaderboard
+  - Secret-based admin setup (POST /api/admin/set-admin)
 
 ## Testing Status
-- Backend: 100% (16/16 tests passed)
-- Frontend: 95% (1 minor overlay issue fixed)
+- Backend: 91-100% across 3 iterations (all core features pass)
+- Frontend: 95% (minor clipboard permission in automated testing only)
 
 ## Prioritized Backlog
 
