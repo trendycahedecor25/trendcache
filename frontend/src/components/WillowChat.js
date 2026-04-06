@@ -215,7 +215,7 @@ export default function WillowChat() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-slate-100 bg-white" data-testid="chat-input-area">
+        <div className="p-4 pb-6 border-t border-slate-100 bg-white relative z-50" data-testid="chat-input-area">
           <form
             onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
             className="flex items-center gap-3 bg-slate-50 rounded-2xl px-4 py-2"
