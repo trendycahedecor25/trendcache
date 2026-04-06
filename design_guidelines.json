@@ -1,0 +1,81 @@
+{
+  "project_name": "HEARD",
+  "theme": "LIGHT",
+  "archetype": "3 (Pastel & Soft) - Customized for High Vibrancy",
+  "design_philosophy": "The design must feel warm, energetic, and empathetic. Banish all 'sad/boring' pastel tones. We are substituting dull clinical vibes with a vibrant, sunny palette that feels like a fresh morning. We use 'Soft' geometries (rounded corners) paired with 'High Vibrancy' colors to create an empowering space for mothers.",
+  "colors": {
+    "background": "#FFF9F5",
+    "surface": "#FFFFFF",
+    "primary": "#FF715B",
+    "primary_hover": "#FF573D",
+    "secondary": "#FFB627",
+    "tertiary": "#4E9FE5",
+    "success": "#10B981",
+    "text_primary": "#1E293B",
+    "text_secondary": "#64748B",
+    "border": "#F1F5F9"
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Figtree",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-black text-slate-900",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold text-slate-900",
+      "h3": "text-xl sm:text-2xl font-semibold text-slate-800",
+      "body": "text-base leading-relaxed text-slate-700",
+      "label": "text-xs tracking-[0.2em] uppercase font-bold text-slate-500"
+    }
+  },
+  "layout_spacing": {
+    "global_padding": "p-4 md:p-8 lg:p-12",
+    "container_radius": "rounded-3xl",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "card_style": "bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 rounded-3xl p-6 md:p-8 hover:shadow-[0_8px_30px_rgb(255,113,91,0.08)] hover:-translate-y-1 transition-all duration-300"
+  },
+  "components": {
+    "button_primary": "bg-[#FF715B] text-white hover:bg-[#FF573D] rounded-full px-8 py-4 font-semibold shadow-[0_4px_14px_0_rgba(255,113,91,0.39)] hover:shadow-[0_6px_20px_rgba(255,113,91,0.23)] hover:-translate-y-0.5 transition-all duration-200",
+    "glass_header": "backdrop-blur-xl bg-white/80 border-b border-slate-200/50 sticky top-0 z-50",
+    "willow_chat_bubble": "bg-gradient-to-br from-[#FFB627]/10 to-[#FF715B]/10 border border-[#FF715B]/20 rounded-3xl rounded-bl-none p-5 text-slate-800",
+    "user_chat_bubble": "bg-[#1E293B] text-white rounded-3xl rounded-br-none p-5",
+    "mood_tracker_widget": "bg-gradient-to-br from-[#4E9FE5]/10 to-[#10B981]/10 rounded-3xl p-6 border border-white shadow-sm",
+    "quick_action_card": "relative overflow-hidden bg-white rounded-3xl p-6 border border-slate-100 hover:border-[#FFB627]/30 transition-colors group"
+  },
+  "images": [
+    {
+      "category": "hero_background",
+      "url": "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/0464a7efb70cd6cf856c4c9086f7fbee5ebb4127c508bf3e5cdc954d3b3bfae0.png",
+      "description": "Vibrant sunrise background for the landing or dashboard greeting. Use this as a subtle background pattern or hero image header to bring extreme positivity."
+    },
+    {
+      "category": "ai_avatar_willow",
+      "url": "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png",
+      "description": "3D orb icon for Willow AI avatar. Use it in chat interfaces, notification icons, and empty states."
+    },
+    {
+      "category": "positive_texture",
+      "url": "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/8f5fd3220273ed658ead6bc3e9f1bb9d3e40e98dd59ab133a85bfc57250dd1f6.png",
+      "description": "Positive energy texture for section backgrounds or quick action cards."
+    },
+    {
+      "category": "journaling_thumbnail",
+      "url": "https://images.unsplash.com/photo-1579741370245-a1bf1cf90c4e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwxfHxicmlnaHQlMjBtb3JuaW5nJTIwam91cm5hbHxlbnwwfHx8fDE3NzU0NjEyMzF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Journaling related imagery to be used in the Journal & Notes Section headers."
+    }
+  ],
+  "icons": {
+    "library": "lucide-react",
+    "instructions": "Use lucide-react. Set stroke width to 2 or 2.5 for clear, friendly, and approachable icons."
+  },
+  "animation_motion": {
+    "hover_states": "All cards and buttons must have -translate-y-1 and elevated shadow transition-all duration-300.",
+    "page_transitions": "Use Framer Motion to stagger bento grid items on dashboard entry. Start from opacity 0 and y 20 to opacity 1 and y 0."
+  },
+  "instructions_to_main_agent": [
+    "Ensure all interactive elements have data-testid attributes (e.g., data-testid='chat-input').",
+    "Use Outfit for all headings and Figtree for body text. Install these via Google Fonts in your main CSS file.",
+    "Do NOT use a muddy or dull layout. Follow the vibrant color palette strictly to create a warm, energetic, and positive space that directly addresses the user feedback.",
+    "Use Shadcn UI but heavily customize the radius to rounded-3xl to make components soft, pill-like, and approachable.",
+    "The AI Chat (Willow) should feel distinct from a normal support chat. Use the AI avatar provided and warm gradient bubbles.",
+    "Bento grid (dashboard): Ensure strict spacing gaps (gap-6) and optical alignment. The main greeting widget should span multiple columns for emphasis."
+  ]
+}
