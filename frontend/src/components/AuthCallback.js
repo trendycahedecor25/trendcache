@@ -17,13 +17,17 @@ export default function AuthCallback() {
     const hash = window.location.hash;
     const sessionId = new URLSearchParams(hash.slice(1)).get('session_id');
 
+    // Extract referral code from the URL path/query (came through redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const refCode = urlParams.get('ref') || '';
+
     if (!sessionId) {
       navigate('/', { replace: true });
       return;
     }
 
     axios
-      .post(`${API}/auth/session`, { session_id: sessionId }, { withCredentials: true })
+      .post(`${API}/auth/session`, { session_id: sessionId, referral_code: refCode || null }, { withCredentials: true })
       .then((res) => {
         setUser(res.data);
         navigate('/dashboard', { state: { user: res.data }, replace: true });

@@ -7,6 +7,8 @@ import os
 import logging
 import uuid
 import httpx
+import random
+import string
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
@@ -40,6 +42,7 @@ class UserProfile(BaseModel):
 
 class SessionExchange(BaseModel):
     session_id: str
+    referral_code: Optional[str] = None
 
 class ChatMessageRequest(BaseModel):
     conversation_id: Optional[str] = None
@@ -158,6 +161,13 @@ async def get_daily_chat_count(user_id: str) -> int:
     result = await db.conversations.aggregate(pipeline).to_list(1)
     return result[0]["total"] if result else 0
 
+
+def generate_referral_code():
+    return "HEARD" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+REFERRAL_REWARD_DAYS = 30  # Both referrer and referee get 30 days premium
+
 # ─── Willow System Prompt ───
 
 WILLOW_BASE_PROMPT = """You are Willow, an empathetic AI companion within the HEARD app, designed specifically for mothers who are doing it all — often without the support they deserve.
@@ -269,6 +279,11 @@ async def exchange_session(body: SessionExchange, response: Response):
         await db.users.update_one({"email": email}, {"$set": {"name": name, "picture": picture}})
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
+        referral_code = generate_referral_code()
+        # Ensure unique referral code
+        while await db.users.find_one({"referral_code": referral_code}):
+            referral_code = generate_referral_code()
+
         await db.users.insert_one({
             "user_id": user_id,
             "email": email,
@@ -276,8 +291,49 @@ async def exchange_session(body: SessionExchange, response: Response):
             "picture": picture,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "trial_end": (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat(),
-            "subscription_status": "trial"
+            "subscription_status": "trial",
+            "referral_code": referral_code,
+            "referred_by": None,
+            "referral_count": 0,
+            "is_admin": False
         })
+
+        # Process incoming referral code
+        if body.referral_code:
+            referrer = await db.users.find_one({"referral_code": body.referral_code}, {"_id": 0})
+            if referrer and referrer["user_id"] != user_id:
+                now = datetime.now(timezone.utc)
+                # Reward the new user: extend trial by 30 days
+                new_end = (now + timedelta(days=TRIAL_DAYS + REFERRAL_REWARD_DAYS)).isoformat()
+                await db.users.update_one(
+                    {"user_id": user_id},
+                    {"$set": {"trial_end": new_end, "referred_by": referrer["user_id"]}}
+                )
+                # Reward the referrer: extend subscription by 30 days
+                referrer_sub_end = referrer.get("subscription_end") or referrer.get("trial_end")
+                if referrer_sub_end:
+                    if isinstance(referrer_sub_end, str):
+                        referrer_sub_end = datetime.fromisoformat(referrer_sub_end)
+                    if referrer_sub_end.tzinfo is None:
+                        referrer_sub_end = referrer_sub_end.replace(tzinfo=timezone.utc)
+                    if referrer_sub_end < now:
+                        referrer_sub_end = now
+                else:
+                    referrer_sub_end = now
+                new_referrer_end = (referrer_sub_end + timedelta(days=REFERRAL_REWARD_DAYS)).isoformat()
+                await db.users.update_one(
+                    {"user_id": referrer["user_id"]},
+                    {"$set": {"subscription_end": new_referrer_end, "subscription_status": "active"},
+                     "$inc": {"referral_count": 1}}
+                )
+                # Track referral
+                await db.referrals.insert_one({
+                    "referral_id": f"ref_{uuid.uuid4().hex[:12]}",
+                    "referrer_user_id": referrer["user_id"],
+                    "referee_user_id": user_id,
+                    "referral_code": body.referral_code,
+                    "created_at": now.isoformat()
+                })
 
     await db.user_sessions.insert_one({
         "user_id": user_id,
@@ -301,7 +357,13 @@ async def exchange_session(body: SessionExchange, response: Response):
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     sub_info = await get_subscription_info(user["user_id"])
-    return {**user, "subscription": sub_info}
+    return {
+        **user,
+        "subscription": sub_info,
+        "referral_code": user.get("referral_code", ""),
+        "referral_count": user.get("referral_count", 0),
+        "is_admin": user.get("is_admin", False)
+    }
 
 
 @api_router.post("/auth/logout")
@@ -739,6 +801,139 @@ async def stripe_webhook(request: Request):
         logger.error(f"Webhook error: {e}")
 
     return {"status": "ok"}
+
+
+# ─── Referral Routes ───
+
+@api_router.get("/referral/info")
+async def get_referral_info(user: dict = Depends(get_current_user)):
+    referral_code = user.get("referral_code", "")
+    referral_count = user.get("referral_count", 0)
+    referrals = await db.referrals.find(
+        {"referrer_user_id": user["user_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    # Get referee names
+    referral_details = []
+    for ref in referrals:
+        referee = await db.users.find_one({"user_id": ref["referee_user_id"]}, {"_id": 0, "name": 1})
+        referral_details.append({
+            "name": referee.get("name", "A mom") if referee else "A mom",
+            "date": ref.get("created_at", "")
+        })
+
+    return {
+        "referral_code": referral_code,
+        "referral_count": referral_count,
+        "referrals": referral_details,
+        "reward_days": REFERRAL_REWARD_DAYS
+    }
+
+
+# ─── Admin Routes ───
+
+async def require_admin(user: dict = Depends(get_current_user)):
+    if not user.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+@api_router.get("/admin/analytics")
+async def get_analytics(user: dict = Depends(require_admin)):
+    now = datetime.now(timezone.utc)
+    today_str = now.strftime("%Y-%m-%d")
+    week_ago = (now - timedelta(days=7)).isoformat()
+    month_ago = (now - timedelta(days=30)).isoformat()
+
+    # User counts
+    total_users = await db.users.count_documents({})
+    new_today = await db.users.count_documents({"created_at": {"$regex": f"^{today_str}"}})
+    new_this_week = await db.users.count_documents({"created_at": {"$gte": week_ago}})
+    new_this_month = await db.users.count_documents({"created_at": {"$gte": month_ago}})
+
+    # Subscription breakdown
+    all_users = await db.users.find({}, {"_id": 0, "user_id": 1, "trial_end": 1, "subscription_end": 1, "subscription_status": 1}).to_list(10000)
+    trial_count = 0
+    active_count = 0
+    free_count = 0
+    for u in all_users:
+        info = await get_subscription_info(u["user_id"])
+        if info["status"] == "trial":
+            trial_count += 1
+        elif info["status"] == "active":
+            active_count += 1
+        else:
+            free_count += 1
+
+    # Revenue
+    paid_txns = await db.payment_transactions.find(
+        {"payment_status": "paid"}, {"_id": 0, "amount": 1}
+    ).to_list(10000)
+    total_revenue = sum(t.get("amount", 0) for t in paid_txns)
+
+    # Referral stats
+    total_referrals = await db.referrals.count_documents({})
+    referrals_this_month = await db.referrals.count_documents({"created_at": {"$gte": month_ago}})
+
+    # Engagement stats
+    total_conversations = await db.conversations.count_documents({})
+    total_journal_entries = await db.journal_entries.count_documents({})
+    total_mood_entries = await db.mood_entries.count_documents({})
+    total_events = await db.calendar_events.count_documents({})
+
+    # Recent signups
+    recent_users = await db.users.find(
+        {}, {"_id": 0, "user_id": 1, "name": 1, "email": 1, "created_at": 1, "subscription_status": 1, "referral_count": 1}
+    ).sort("created_at", -1).limit(20).to_list(20)
+
+    # Top referrers
+    top_referrers = await db.users.find(
+        {"referral_count": {"$gt": 0}},
+        {"_id": 0, "name": 1, "email": 1, "referral_count": 1}
+    ).sort("referral_count", -1).limit(10).to_list(10)
+
+    return {
+        "users": {
+            "total": total_users,
+            "new_today": new_today,
+            "new_this_week": new_this_week,
+            "new_this_month": new_this_month,
+            "trial": trial_count,
+            "active_premium": active_count,
+            "free": free_count
+        },
+        "revenue": {
+            "total": round(total_revenue, 2),
+            "total_transactions": len(paid_txns)
+        },
+        "referrals": {
+            "total": total_referrals,
+            "this_month": referrals_this_month,
+            "top_referrers": top_referrers
+        },
+        "engagement": {
+            "conversations": total_conversations,
+            "journal_entries": total_journal_entries,
+            "mood_entries": total_mood_entries,
+            "calendar_events": total_events
+        },
+        "recent_signups": recent_users
+    }
+
+
+@api_router.post("/admin/set-admin")
+async def set_admin_by_email(request: Request):
+    """One-time setup: set admin by providing the admin secret from env"""
+    body = await request.json()
+    email = body.get("email")
+    secret = body.get("secret")
+    # Simple secret-based admin setup (use env var or hardcoded for now)
+    if secret != "HEARD_ADMIN_2026":
+        raise HTTPException(status_code=403, detail="Invalid secret")
+    result = await db.users.update_one({"email": email}, {"$set": {"is_admin": True}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": f"Admin access granted to {email}"}
 
 
 # ─── Health Check ───

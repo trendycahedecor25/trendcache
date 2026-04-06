@@ -590,6 +590,176 @@ class HEARDAPITester:
             self.log_test("Calendar Create", False, "Failed to create calendar event",
                          200, response.status_code if response else "No response")
 
+    def test_referral_info(self):
+        """Test referral info endpoint"""
+        response = self.make_request('GET', 'referral/info')
+        if response and response.status_code == 200:
+            data = response.json()
+            success = ('referral_code' in data and 'referral_count' in data and 
+                      'referrals' in data and 'reward_days' in data)
+            self.log_test("Referral Info", success,
+                         f"Missing referral data: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Referral Info", False, "Failed to get referral info",
+                         200, response.status_code if response else "No response")
+
+    def test_auth_me_referral_fields(self):
+        """Test that auth/me returns referral fields"""
+        response = self.make_request('GET', 'auth/me')
+        if response and response.status_code == 200:
+            data = response.json()
+            success = ('referral_code' in data and 'referral_count' in data and 
+                      'is_admin' in data)
+            self.log_test("Auth Me Referral Fields", success,
+                         f"Missing referral fields in auth/me: {data}" if not success else "",
+                         200, response.status_code)
+        else:
+            self.log_test("Auth Me Referral Fields", False, "Failed to get user info with referral fields",
+                         200, response.status_code if response else "No response")
+
+    def test_admin_set_admin(self):
+        """Test setting admin access"""
+        # First test with wrong secret
+        admin_data = {
+            "email": f"test.user.{int(datetime.now().timestamp())}@example.com",
+            "secret": "wrong_secret"
+        }
+        response = self.make_request('POST', 'admin/set-admin', admin_data, auth_required=False)
+        if response and response.status_code == 403:
+            self.log_test("Admin Set Admin (Wrong Secret)", True, "", 403, response.status_code)
+        else:
+            self.log_test("Admin Set Admin (Wrong Secret)", False, "Should reject wrong secret",
+                         403, response.status_code if response else "No response")
+        
+        # Test with correct secret but non-existent user
+        admin_data = {
+            "email": "nonexistent@example.com",
+            "secret": "HEARD_ADMIN_2026"
+        }
+        response = self.make_request('POST', 'admin/set-admin', admin_data, auth_required=False)
+        if response and response.status_code == 404:
+            self.log_test("Admin Set Admin (User Not Found)", True, "", 404, response.status_code)
+        else:
+            self.log_test("Admin Set Admin (User Not Found)", False, "Should return 404 for non-existent user",
+                         404, response.status_code if response else "No response")
+
+    def test_admin_analytics_unauthorized(self):
+        """Test admin analytics endpoint without admin access"""
+        response = self.make_request('GET', 'admin/analytics')
+        if response and response.status_code == 403:
+            self.log_test("Admin Analytics (Unauthorized)", True, "", 403, response.status_code)
+        else:
+            self.log_test("Admin Analytics (Unauthorized)", False, "Should reject non-admin users",
+                         403, response.status_code if response else "No response")
+
+    def test_admin_flow(self):
+        """Test complete admin flow: set admin, then access analytics"""
+        # Get current user email from auth/me
+        response = self.make_request('GET', 'auth/me')
+        if not (response and response.status_code == 200):
+            self.log_test("Admin Flow Setup", False, "Failed to get user info")
+            return
+        
+        user_data = response.json()
+        user_email = user_data.get('email')
+        if not user_email:
+            self.log_test("Admin Flow Setup", False, "No email in user data")
+            return
+        
+        # Set admin access with correct secret
+        admin_data = {
+            "email": user_email,
+            "secret": "HEARD_ADMIN_2026"
+        }
+        response = self.make_request('POST', 'admin/set-admin', admin_data, auth_required=False)
+        if response and response.status_code == 200:
+            self.log_test("Admin Set Admin (Success)", True, "", 200, response.status_code)
+            
+            # Now test admin analytics access
+            response = self.make_request('GET', 'admin/analytics')
+            if response and response.status_code == 200:
+                data = response.json()
+                success = ('users' in data and 'revenue' in data and 'referrals' in data and 
+                          'engagement' in data and 'recent_signups' in data)
+                self.log_test("Admin Analytics (Authorized)", success,
+                             f"Missing analytics data: {data}" if not success else "",
+                             200, response.status_code)
+            else:
+                self.log_test("Admin Analytics (Authorized)", False, "Failed to get analytics as admin",
+                             200, response.status_code if response else "No response")
+        else:
+            self.log_test("Admin Set Admin (Success)", False, "Failed to set admin access",
+                         200, response.status_code if response else "No response")
+
+    def test_new_user_referral_code(self):
+        """Test that new users get referral codes"""
+        # Create a new user and check if they get a referral code
+        timestamp = int(datetime.now().timestamp())
+        user_id = f"new-user-{timestamp}"
+        session_token = f"new_session_{timestamp}"
+        
+        try:
+            # Insert new user with referral code (simulating signup)
+            user_doc = {
+                "user_id": user_id,
+                "email": f"new.user.{timestamp}@example.com",
+                "name": "New User",
+                "picture": "https://via.placeholder.com/150",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "trial_end": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                "subscription_status": "trial",
+                "referral_code": f"HEARD{timestamp}",  # Simulate generated code
+                "referral_count": 0,
+                "is_admin": False
+            }
+            self.db.users.insert_one(user_doc)
+            
+            # Insert session
+            session_doc = {
+                "user_id": user_id,
+                "session_token": session_token,
+                "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            self.db.user_sessions.insert_one(session_doc)
+            
+            # Store original session
+            original_session = self.session_token
+            original_user_id = self.user_id
+            
+            # Switch to new user
+            self.session_token = session_token
+            self.user_id = user_id
+            
+            # Test auth/me returns referral code
+            response = self.make_request('GET', 'auth/me')
+            if response and response.status_code == 200:
+                data = response.json()
+                success = (data.get('referral_code') and 
+                          data.get('referral_count') == 0 and 
+                          data.get('is_admin') == False)
+                self.log_test("New User Referral Code", success,
+                             f"Missing or invalid referral data: {data}" if not success else "",
+                             200, response.status_code)
+            else:
+                self.log_test("New User Referral Code", False, "Failed to get new user info",
+                             200, response.status_code if response else "No response")
+            
+            # Restore original session
+            self.session_token = original_session
+            self.user_id = original_user_id
+            
+        except Exception as e:
+            self.log_test("New User Referral Code", False, f"Exception: {e}")
+        finally:
+            # Cleanup
+            try:
+                self.db.users.delete_many({"user_id": user_id})
+                self.db.user_sessions.delete_many({"user_id": user_id})
+            except Exception as e:
+                print(f"⚠️ Cleanup warning: {e}")
+
     def test_logout(self):
         """Test logout functionality"""
         response = self.make_request('POST', 'auth/logout', {})
@@ -637,6 +807,15 @@ class HEARDAPITester:
             self.test_journal_functionality()
             self.test_journal_prompts()
             self.test_calendar_functionality()
+            
+            # Test new referral and admin features
+            self.test_referral_info()
+            self.test_auth_me_referral_fields()
+            self.test_new_user_referral_code()
+            self.test_admin_set_admin()
+            self.test_admin_analytics_unauthorized()
+            self.test_admin_flow()
+            
             self.test_logout()
             
         finally:

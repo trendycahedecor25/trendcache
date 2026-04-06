@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, MessageCircle, BookOpen, Calendar, LogOut, Menu, X, Crown } from 'lucide-react';
+import { LayoutDashboard, MessageCircle, BookOpen, Calendar, LogOut, Menu, X, Crown, BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
@@ -12,6 +12,8 @@ const navItems = [
   { to: '/calendar', icon: Calendar, label: 'Calendar' },
   { to: '/pricing', icon: Crown, label: 'Premium' },
 ];
+
+const adminNavItem = { to: '/admin', icon: BarChart3, label: 'Admin' };
 
 export default function AppLayout({ children }) {
   const { user, logout } = useAuth();
@@ -41,6 +43,12 @@ export default function AppLayout({ children }) {
               {item.label}
             </NavLink>
           ))}
+          {user?.is_admin && (
+            <NavLink to={adminNavItem.to} className={linkClass} data-testid="nav-admin">
+              <adminNavItem.icon className="w-5 h-5" strokeWidth={2} />
+              {adminNavItem.label}
+            </NavLink>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-100">
