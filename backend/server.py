@@ -351,7 +351,7 @@ async def exchange_session(body: SessionExchange, response: Response):
         path="/",
         max_age=7 * 24 * 3600
     )
-    return {"user_id": user_id, "email": email, "name": name, "picture": picture}
+    return {"user_id": user_id, "email": email, "name": name, "picture": picture, "session_token": session_token}
 
 
 @api_router.get("/auth/me")

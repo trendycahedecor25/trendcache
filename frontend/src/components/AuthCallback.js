@@ -8,7 +8,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function AuthCallback() {
   const hasProcessed = useRef(false);
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth();
 
   useEffect(() => {
     if (hasProcessed.current) return;
@@ -29,13 +29,15 @@ export default function AuthCallback() {
     axios
       .post(`${API}/auth/session`, { session_id: sessionId, referral_code: refCode || null }, { withCredentials: true })
       .then((res) => {
-        setUser(res.data);
+        // Store token in localStorage as fallback for cookie issues
+        login(res.data, res.data.session_token);
         navigate('/dashboard', { state: { user: res.data }, replace: true });
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Auth callback error:', err);
         navigate('/', { replace: true });
       });
-  }, [navigate, setUser]);
+  }, [navigate, login]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFF9F5]" data-testid="auth-callback">
