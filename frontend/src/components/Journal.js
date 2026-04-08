@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Plus, BookOpen, Sparkles, Trash2, X, Loader2, Crown } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 
 const moodOptions = ['Happy', 'Grateful', 'Calm', 'Anxious', 'Tired', 'Overwhelmed', 'Hopeful', 'Frustrated'];
 const moodColors = {

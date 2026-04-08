@@ -4,7 +4,7 @@ import { Check, Sparkles, ArrowRight, MessageCircle, BookOpen, Calendar, Heart, 
 import axios from 'axios';
 import { useState } from 'react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
 
 const freeFeatures = [

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Plus, X, Clock, Loader2, Calendar, Trash2 } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 
 const eventTypeColors = {
   general: '#64748B', appointment: '#4E9FE5', reminder: '#FFB627',

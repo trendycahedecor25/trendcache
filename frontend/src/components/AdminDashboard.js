@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Users, TrendingUp, DollarSign, Share2, MessageCircle, BookOpen, Heart, Calendar, Crown, Award, UserPlus } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 
 function StatCard({ icon: Icon, label, value, sub, color, bg }) {
   return (

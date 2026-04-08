@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 const TOKEN_KEY = 'heard_session_token';
 const AuthContext = createContext(null);
 

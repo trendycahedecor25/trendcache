@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { Share2, Copy, Check, Gift, Users, Heart } from 'lucide-react';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import API from '@/config/api';
 
 export default function ReferralSection() {
   const { user } = useAuth();
