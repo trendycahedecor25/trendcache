@@ -10,6 +10,8 @@ import Journal from "@/components/Journal";
 import CalendarView from "@/components/CalendarView";
 import PricingPage from "@/components/PricingPage";
 import AdminDashboard from "@/components/AdminDashboard";
+import PrivacyPolicy from "@/components/PrivacyPolicy";
+import TermsOfService from "@/components/TermsOfService";
 import { Loader2 } from "lucide-react";
 
 function LoadingScreen() {
@@ -42,6 +44,8 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/chat" element={<ProtectedRoute><WillowChat /></ProtectedRoute>} />
       <Route path="/chat/:conversationId" element={<ProtectedRoute><WillowChat /></ProtectedRoute>} />

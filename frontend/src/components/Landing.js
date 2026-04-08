@@ -168,12 +168,16 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-slate-100">
-        <div className="max-w-6xl mx-auto flex items-center justify-between text-sm text-slate-500">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <div className="flex items-center gap-2">
             <img src={WILLOW_AVATAR} alt="HEARD" className="w-5 h-5 rounded-full" />
             <span className="font-['Outfit'] font-semibold">HEARD</span>
           </div>
           <p>Made with love for every mom doing her best.</p>
+          <div className="flex items-center gap-4">
+            <a href="/privacy" className="hover:text-slate-700 transition-colors" data-testid="footer-privacy-link">Privacy Policy</a>
+            <a href="/terms" className="hover:text-slate-700 transition-colors" data-testid="footer-terms-link">Terms of Service</a>
+          </div>
         </div>
       </footer>
     </div>
