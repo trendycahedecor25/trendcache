@@ -453,7 +453,11 @@ async def send_chat_message(body: ChatMessageRequest, user: dict = Depends(get_c
     chat.with_model("openai", "gpt-5.2")
 
     user_message = UserMessage(text=body.message)
-    willow_response = await chat.send_message(user_message)
+    try:
+        willow_response = await chat.send_message(user_message)
+    except Exception as e:
+        logger.error(f"Willow AI error: {e}")
+        willow_response = "I'm sorry, I'm having a little moment right now. Could you try again in a minute? I'm still here for you."
 
     # Store messages
     user_msg = {"role": "user", "content": body.message, "timestamp": now}
@@ -558,9 +562,17 @@ async def get_journal_prompts(user: dict = Depends(get_current_user)):
         system_message="You generate 3 thoughtful, warm journaling prompts for a mother. Keep them short (1 sentence each). Return ONLY the 3 prompts, numbered 1-3. Make them reflective and empowering. " + mood_context
     )
     chat.with_model("openai", "gpt-5.2")
-    response = await chat.send_message(UserMessage(text="Generate 3 journaling prompts for me today."))
-    prompts = [line.strip() for line in response.strip().split("\n") if line.strip()]
-    return {"prompts": prompts[:3]}
+    try:
+        response = await chat.send_message(UserMessage(text="Generate 3 journaling prompts for me today."))
+        prompts = [line.strip() for line in response.strip().split("\n") if line.strip()]
+        return {"prompts": prompts[:3]}
+    except Exception as e:
+        logger.error(f"Journal prompts AI error: {e}")
+        return {"prompts": [
+            "1. What's one small thing that made you smile today?",
+            "2. Write about a moment this week when you felt proud of yourself as a mom.",
+            "3. If you could tell your future self one thing right now, what would it be?"
+        ]}
 
 
 # ─── Calendar Routes ───
@@ -813,12 +825,17 @@ async def get_referral_info(user: dict = Depends(get_current_user)):
         {"referrer_user_id": user["user_id"]}, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
 
-    # Get referee names
+    # Get referee names in batch
+    referee_ids = [ref["referee_user_id"] for ref in referrals]
+    referees = {}
+    if referee_ids:
+        referee_docs = await db.users.find({"user_id": {"$in": referee_ids}}, {"_id": 0, "user_id": 1, "name": 1}).to_list(len(referee_ids))
+        referees = {doc["user_id"]: doc.get("name", "A mom") for doc in referee_docs}
+
     referral_details = []
     for ref in referrals:
-        referee = await db.users.find_one({"user_id": ref["referee_user_id"]}, {"_id": 0, "name": 1})
         referral_details.append({
-            "name": referee.get("name", "A mom") if referee else "A mom",
+            "name": referees.get(ref["referee_user_id"], "A mom"),
             "date": ref.get("created_at", "")
         })
 
@@ -851,16 +868,18 @@ async def get_analytics(user: dict = Depends(require_admin)):
     new_this_week = await db.users.count_documents({"created_at": {"$gte": week_ago}})
     new_this_month = await db.users.count_documents({"created_at": {"$gte": month_ago}})
 
-    # Subscription breakdown
-    all_users = await db.users.find({}, {"_id": 0, "user_id": 1, "trial_end": 1, "subscription_end": 1, "subscription_status": 1}).to_list(10000)
+    # Subscription breakdown - calculate inline without N+1 queries
+    all_users = await db.users.find({}, {"_id": 0, "user_id": 1, "trial_end": 1, "subscription_end": 1}).to_list(10000)
     trial_count = 0
     active_count = 0
     free_count = 0
+    now_iso = now.isoformat()
     for u in all_users:
-        info = await get_subscription_info(u["user_id"])
-        if info["status"] == "trial":
+        trial_end = u.get("trial_end", "")
+        sub_end = u.get("subscription_end", "")
+        if trial_end and trial_end > now_iso:
             trial_count += 1
-        elif info["status"] == "active":
+        elif sub_end and sub_end > now_iso:
             active_count += 1
         else:
             free_count += 1
@@ -927,8 +946,7 @@ async def set_admin_by_email(request: Request):
     body = await request.json()
     email = body.get("email")
     secret = body.get("secret")
-    # Simple secret-based admin setup (use env var or hardcoded for now)
-    if secret != "HEARD_ADMIN_2026":
+    if secret != os.environ.get("ADMIN_SECRET", ""):
         raise HTTPException(status_code=403, detail="Invalid secret")
     result = await db.users.update_one({"email": email}, {"$set": {"is_admin": True}})
     if result.matched_count == 0:
