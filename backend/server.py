@@ -868,27 +868,45 @@ async def get_analytics(user: dict = Depends(require_admin)):
     new_this_week = await db.users.count_documents({"created_at": {"$gte": week_ago}})
     new_this_month = await db.users.count_documents({"created_at": {"$gte": month_ago}})
 
-    # Subscription breakdown - calculate inline without N+1 queries
-    all_users = await db.users.find({}, {"_id": 0, "user_id": 1, "trial_end": 1, "subscription_end": 1}).to_list(10000)
-    trial_count = 0
-    active_count = 0
-    free_count = 0
+    # Subscription breakdown via aggregation (no full collection load)
     now_iso = now.isoformat()
-    for u in all_users:
-        trial_end = u.get("trial_end", "")
-        sub_end = u.get("subscription_end", "")
-        if trial_end and trial_end > now_iso:
-            trial_count += 1
-        elif sub_end and sub_end > now_iso:
-            active_count += 1
-        else:
-            free_count += 1
+    sub_pipeline = [
+        {"$project": {
+            "_id": 0,
+            "status": {
+                "$cond": [
+                    {"$and": [
+                        {"$ne": [{"$ifNull": ["$trial_end", ""]}, ""]},
+                        {"$gt": [{"$ifNull": ["$trial_end", ""]}, now_iso]}
+                    ]},
+                    "trial",
+                    {"$cond": [
+                        {"$and": [
+                            {"$ne": [{"$ifNull": ["$subscription_end", ""]}, ""]},
+                            {"$gt": [{"$ifNull": ["$subscription_end", ""]}, now_iso]}
+                        ]},
+                        "active",
+                        "free"
+                    ]}
+                ]
+            }
+        }},
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]
+    sub_results = await db.users.aggregate(sub_pipeline).to_list(10)
+    sub_counts = {r["_id"]: r["count"] for r in sub_results}
+    trial_count = sub_counts.get("trial", 0)
+    active_count = sub_counts.get("active", 0)
+    free_count = sub_counts.get("free", 0)
 
-    # Revenue
-    paid_txns = await db.payment_transactions.find(
-        {"payment_status": "paid"}, {"_id": 0, "amount": 1}
-    ).to_list(10000)
-    total_revenue = sum(t.get("amount", 0) for t in paid_txns)
+    # Revenue via aggregation (no full collection load)
+    rev_pipeline = [
+        {"$match": {"payment_status": "paid"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
+    ]
+    rev_results = await db.payment_transactions.aggregate(rev_pipeline).to_list(1)
+    total_revenue = rev_results[0]["total"] if rev_results else 0
+    total_paid_count = rev_results[0]["count"] if rev_results else 0
 
     # Referral stats
     total_referrals = await db.referrals.count_documents({})
@@ -923,7 +941,7 @@ async def get_analytics(user: dict = Depends(require_admin)):
         },
         "revenue": {
             "total": round(total_revenue, 2),
-            "total_transactions": len(paid_txns)
+            "total_transactions": total_paid_count
         },
         "referrals": {
             "total": total_referrals,
