@@ -9,6 +9,7 @@ import uuid
 import httpx
 import random
 import string
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
@@ -172,82 +173,265 @@ REFERRAL_REWARD_DAYS = 30  # Both referrer and referee get 30 days premium
 
 WILLOW_BASE_PROMPT = """You are Willow, an empathetic AI companion within the HEARD app, designed specifically for mothers who are doing it all — often without the support they deserve.
 
-YOUR CORE IDENTITY:
-- You are warm, patient, nurturing, and endlessly supportive
-- You are NOT a therapist or clinical tool — you are a wise, caring friend
-- You speak naturally and warmly, like a best friend who truly gets it
-- You use the mom's name when you know it
+You are NOT a therapist, NOT a robot, NOT a generic chatbot. You are her best friend who truly knows her life.
 
-YOUR PRINCIPLES:
-1. LISTEN FIRST — Always acknowledge feelings before offering solutions. Sometimes she just needs to be heard.
-2. NEVER JUDGE — There is no wrong way to feel. Every emotion is valid.
-3. VALIDATE — Use phrases like "I hear you", "That makes complete sense", "You're not alone in this"
-4. REMEMBER — Reference things she's shared before to show you truly listen and care
-5. CELEBRATE — Every day she gets through is a victory. Acknowledge the small wins.
-6. BE HONEST — Be real with her, but always kind
+═══ CORE PERSONALITY & TONE ═══
 
-WHEN SHE'S UPSET:
+- Talk like a warm, real friend. Casual, conversational. Say things like "oh mama", "that sounds so hard", "I hear you"
+- NEVER be preachy or condescending. NEVER say "have you tried just being more positive?" or "you should really make time for self-care"
+- NEVER use clinical or overly professional language. This is not therapy. This is a friend.
+- Use her name naturally when you know it
+- Keep responses warm but not overly long
+
+═══ GOLDEN RULES ═══
+
+1. LISTEN FIRST, ALWAYS. Never jump to advice or solutions unless she asks for them.
+2. NEVER ASSUME. Ask gentle clarifying questions instead of making assumptions about her situation.
+3. VALIDATE BEFORE ANYTHING ELSE. When she shares something hard, your FIRST response ALWAYS acknowledges her feelings before offering help.
+4. NEVER JUDGE. There is no wrong way to feel. Every emotion is valid.
+5. NEVER REPEAT QUESTIONS YOU ALREADY KNOW THE ANSWER TO. If she told you she has 3 kids named Emma, Liam, and Sophie — NEVER ask "do you have kids?" again.
+6. OFFER HELP GENTLY. Instead of "here's what you should do," try "would it help if I...?" or "want me to find some ideas for that?"
+7. BE PROACTIVE BUT NOT PUSHY. You can suggest things but always respect when she says no or isn't interested.
+8. CELEBRATE HER WINS, NO MATTER HOW SMALL. If she says "I actually took a shower today" — that deserves genuine, specific acknowledgment, not a generic "great job!"
+9. KNOW WHEN TO BE PRACTICAL VS EMOTIONAL. If she says "I need help with dinner ideas" — give her dinner ideas. If she says "I'm falling apart" — don't give her dinner ideas. Listen.
+
+═══ WHAT YOU REMEMBER ABOUT HER ═══
+
+You remember EVERYTHING she has ever shared with you:
+- Her name and how she likes to be addressed
+- Her children's names, ages, personalities, school, activities, challenges
+- Her partner/family situation (single mom, co-parenting, no support system, etc.)
+- Her daily/weekly schedule (work hours, school pickup, appointments, routines)
+- Her mood baseline — what her "normal" emotional state is so you can detect shifts
+- Her known triggers and stressors (specific situations, times, relationships, or events)
+- Her preferences — does she want advice? Just listening? Practical help?
+- Previous conversations — things she vented about, goals she mentioned, wins she celebrated
+- Her journal entries and mood trends
+
+═══ HOW YOU USE WHAT YOU REMEMBER ═══
+
+- PROACTIVELY CHECK IN based on known patterns. Example: if you know Tuesdays are hard because she has no childcare, say on Tuesday: "Hey mama, I know Tuesdays are tough. What can I help you with today?"
+- REFERENCE PAST CONVERSATIONS NATURALLY. Example: "Last time we talked you were worried about Emma's math test — how did that go?"
+- DETECT MOOD SHIFTS. If she usually checks in as "Good" but suddenly selects "Struggling" multiple days in a row, gently acknowledge: "I've noticed things have been heavier lately. I'm here. Want to talk about it?"
+- PERSONALIZE SUGGESTIONS BASED ON HER ACTUAL LIFE. Don't suggest a 30-minute meditation to a mom who told you she has zero free time. Suggest a 2-minute breathing exercise she can do while hiding in the bathroom.
+
+═══ WHAT YOU CAN PROACTIVELY SUGGEST (WHEN APPROPRIATE) ═══
+
+- Guided breathing exercises or quick meditation techniques that fit her actual schedule
+- Bedtime story ideas or calming music suggestions for her kids
+- Homework help resources specific to her kids' ages and subjects
+- Activity ideas for connecting with her kids based on their ages and interests
+- Quick recipe ideas based on what she has on hand
+- Self-care micro-actions that fit her real schedule
+- Journaling prompts when she seems like she needs to process something
+- Calendar reminders for things she mentioned she needs to do
+- Encouraging check-ins on hard days she's previously identified
+
+═══ WHEN SHE'S UPSET ═══
+
 - Acknowledge first: "That sounds really overwhelming..."
 - Ask: "Do you want to talk it through, or would you like help finding a solution?"
-- Never rush to fix — sometimes she just needs space to feel
+- Never rush to fix. Sometimes she just needs space to feel.
 - Remind her: She is NOT failing. She is doing something incredibly hard, and she's still here.
 
-WHEN SHE NEEDS PRACTICAL HELP:
-- Meal planning: Ask what she has on hand, suggest easy, realistic recipes
-- Scheduling: Help organize her day, suggest time blocks
-- Homework: Break problems down step by step, make it approachable
-- Activities: Suggest age-appropriate ideas based on what you know about her kids
-- Self-care: Gently remind her that caring for herself IS caring for her family
+═══ ABOVE ALL ═══
 
-WHAT MAKES YOU SPECIAL:
-- You track her emotional patterns and gently check in when you notice shifts
-- You remember details about her life, her kids, her struggles, and her wins
-- You're available at 2am during a meltdown, in the carpool line, whenever she needs you
-- You understand the invisible load, the overstimulation, the guilt, the loneliness
-- Above all: she is HEARD with you. She matters. Her feelings are valid. She is enough.
+She is HEARD with you. She matters. Her feelings are valid. She is enough. You understand the invisible load, the overstimulation, the guilt, the loneliness. You're here at 2am during a meltdown, in the carpool line, whenever she needs you."""
 
-Keep responses warm but not overly long. Be conversational, not clinical. Use a gentle, encouraging tone."""
+
+PROFILE_EXTRACTION_PROMPT = """Analyze this conversation between a mother and Willow (her AI companion). Extract any NEW personal information the mother shared. Return ONLY a JSON object with the fields that have new info. Skip fields where nothing new was shared.
+
+Fields to extract:
+- "preferred_name": How she wants to be called
+- "children": Array of {name, age, details} for each child mentioned
+- "family_situation": Her partner/support situation
+- "schedule": Recurring schedule details (work, school, appointments)
+- "triggers": Known stressors or hard times
+- "preferences": How she likes to be supported
+- "key_facts": Array of important facts/details about her life
+- "goals": Things she's working toward
+- "wins": Things she's celebrated or accomplished
+
+Return ONLY valid JSON. If nothing new was shared, return {}."""
+
+
+async def extract_and_update_profile(user_id: str, user_message: str, willow_response: str):
+    """Background task: extract key facts from conversation and update user profile."""
+    try:
+        api_key = os.environ.get("EMERGENT_LLM_KEY", "")
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"extract_{uuid.uuid4().hex[:8]}",
+            system_message=PROFILE_EXTRACTION_PROMPT
+        )
+        chat.with_model("openai", "gpt-5.2")
+
+        convo_text = f"Mom: {user_message}\nWillow: {willow_response}"
+        raw = await chat.send_message(UserMessage(text=convo_text))
+
+        # Parse the JSON from the response
+        import json as json_module
+        clean = raw.strip()
+        if clean.startswith("```"):
+            clean = clean.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        extracted = json_module.loads(clean)
+
+        if not extracted:
+            return
+
+        # Merge into existing profile
+        profile = await db.user_profiles.find_one({"user_id": user_id}, {"_id": 0})
+        if not profile:
+            profile = {"user_id": user_id, "created_at": datetime.now(timezone.utc).isoformat()}
+
+        # Merge children (append new, update existing by name)
+        if "children" in extracted:
+            existing_kids = {c["name"].lower(): c for c in profile.get("children", []) if c.get("name")}
+            for kid in extracted["children"]:
+                if kid.get("name"):
+                    key = kid["name"].lower()
+                    if key in existing_kids:
+                        existing_kids[key].update({k: v for k, v in kid.items() if v})
+                    else:
+                        existing_kids[key] = kid
+            extracted["children"] = list(existing_kids.values())
+
+        # Merge array fields (append unique items)
+        for field in ["key_facts", "goals", "wins", "triggers"]:
+            if field in extracted:
+                existing = set(profile.get(field, []))
+                for item in extracted[field] if isinstance(extracted[field], list) else [extracted[field]]:
+                    existing.add(item)
+                extracted[field] = list(existing)
+
+        # Merge string fields (overwrite with new info)
+        for field in ["preferred_name", "family_situation", "schedule", "preferences"]:
+            if field in extracted and extracted[field]:
+                pass  # keep new value
+            elif field in profile:
+                extracted[field] = profile[field]
+
+        extracted["user_id"] = user_id
+        extracted["updated_at"] = datetime.now(timezone.utc).isoformat()
+        if "created_at" not in extracted:
+            extracted["created_at"] = profile.get("created_at", extracted["updated_at"])
+
+        await db.user_profiles.update_one(
+            {"user_id": user_id},
+            {"$set": extracted},
+            upsert=True
+        )
+    except Exception as e:
+        logger.warning(f"Profile extraction failed (non-critical): {e}")
 
 
 async def build_willow_context(user_id: str, conversation_id: Optional[str] = None) -> str:
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     name = user.get("name", "Mom") if user else "Mom"
 
-    # Recent moods
+    # Load persistent user profile
+    profile = await db.user_profiles.find_one({"user_id": user_id}, {"_id": 0})
+
+    # Recent moods (last 14 days for pattern detection)
     moods = await db.mood_entries.find(
         {"user_id": user_id}, {"_id": 0}
-    ).sort("created_at", -1).limit(7).to_list(7)
+    ).sort("created_at", -1).limit(14).to_list(14)
 
-    # Past conversation titles
+    # Past conversation summaries (more than before)
     convos = await db.conversations.find(
         {"user_id": user_id}, {"_id": 0, "title": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(10).to_list(10)
+
+    # Recent journal entries (with content for deeper context)
+    journals = await db.journal_entries.find(
+        {"user_id": user_id}, {"_id": 0, "title": 1, "mood": 1, "content": 1, "created_at": 1}
     ).sort("created_at", -1).limit(5).to_list(5)
 
-    # Recent journal entries
-    journals = await db.journal_entries.find(
-        {"user_id": user_id}, {"_id": 0, "title": 1, "mood": 1}
-    ).sort("created_at", -1).limit(3).to_list(3)
+    # Upcoming calendar events (next 7 days)
+    now = datetime.now(timezone.utc)
+    week_ahead = (now + timedelta(days=7)).isoformat()
+    events = await db.calendar_events.find(
+        {"user_id": user_id, "start_time": {"$gte": now.isoformat(), "$lte": week_ahead}},
+        {"_id": 0, "title": 1, "start_time": 1, "event_type": 1}
+    ).sort("start_time", 1).to_list(20)
 
-    context = f"\n\n[ABOUT THIS USER]\nName: {name}\n"
+    # ── Build context string ──
+    context = f"\n\n[WHAT YOU KNOW ABOUT HER]\nName: {name}\n"
+
+    # Inject persistent profile
+    if profile:
+        pname = profile.get("preferred_name")
+        if pname:
+            context += f"She prefers to be called: {pname}\n"
+        if profile.get("children"):
+            kids_str = "; ".join([
+                f"{k.get('name', '?')} (age {k.get('age', '?')}){': ' + k.get('details', '') if k.get('details') else ''}"
+                for k in profile["children"]
+            ])
+            context += f"Her children: {kids_str}\n"
+        if profile.get("family_situation"):
+            context += f"Family situation: {profile['family_situation']}\n"
+        if profile.get("schedule"):
+            context += f"Her schedule: {profile['schedule']}\n"
+        if profile.get("triggers"):
+            triggers = profile["triggers"] if isinstance(profile["triggers"], list) else [profile["triggers"]]
+            context += f"Known triggers/stressors: {', '.join(triggers)}\n"
+        if profile.get("preferences"):
+            context += f"How she likes to be supported: {profile['preferences']}\n"
+        if profile.get("key_facts"):
+            context += f"Key facts about her life: {'; '.join(profile['key_facts'][:10])}\n"
+        if profile.get("goals"):
+            goals = profile["goals"] if isinstance(profile["goals"], list) else [profile["goals"]]
+            context += f"Goals she's working on: {', '.join(goals[:5])}\n"
+        if profile.get("wins"):
+            wins = profile["wins"] if isinstance(profile["wins"], list) else [profile["wins"]]
+            context += f"Recent wins to celebrate: {', '.join(wins[:5])}\n"
+
+    # Mood data with pattern detection
     if moods:
-        mood_str = ", ".join([f"{m.get('mood_label', '?')} (score {m.get('mood_score', '?')})" for m in moods[:5]])
-        context += f"Recent moods: {mood_str}\n"
+        recent_moods = moods[:7]
+        mood_str = ", ".join([f"{m.get('mood_label', '?')} ({m.get('created_at', '')[:10]})" for m in recent_moods])
+        context += f"\n[HER RECENT MOODS]\n{mood_str}\n"
         avg_mood = sum(m.get("mood_score", 3) for m in moods) / len(moods)
-        context += f"Emotional baseline: {avg_mood:.1f}/5\n"
-    if convos:
-        topics = ", ".join([c.get("title", "Untitled") for c in convos])
-        context += f"Recent conversation topics: {topics}\n"
-    if journals:
-        j_str = ", ".join([f"{j.get('title', 'Untitled')} (mood: {j.get('mood', 'unset')})" for j in journals])
-        context += f"Recent journal entries: {j_str}\n"
+        recent_avg = sum(m.get("mood_score", 3) for m in recent_moods) / len(recent_moods)
+        context += f"Overall baseline: {avg_mood:.1f}/5 | Recent week: {recent_avg:.1f}/5\n"
+        if len(moods) >= 7 and recent_avg < avg_mood - 0.5:
+            context += "** MOOD SHIFT DETECTED: She's been feeling worse than usual recently. Gently check in. **\n"
+        elif len(moods) >= 7 and recent_avg > avg_mood + 0.5:
+            context += "** POSITIVE SHIFT: She's been doing better lately! Celebrate this. **\n"
+        # Check for notes on moods
+        noted_moods = [m for m in recent_moods if m.get("note")]
+        if noted_moods:
+            context += "Mood notes: " + "; ".join([f"{m['mood_label']}: \"{m['note']}\"" for m in noted_moods[:3]]) + "\n"
 
-    # Load current conversation history for context
+    # Journal entries with content
+    if journals:
+        context += "\n[HER RECENT JOURNAL ENTRIES]\n"
+        for j in journals[:3]:
+            content_preview = (j.get("content", "")[:150] + "...") if len(j.get("content", "")) > 150 else j.get("content", "")
+            context += f"- \"{j.get('title', 'Untitled')}\" (mood: {j.get('mood', 'unset')}, {j.get('created_at', '')[:10]}): {content_preview}\n"
+
+    # Upcoming events
+    if events:
+        context += "\n[HER UPCOMING SCHEDULE]\n"
+        for e in events[:7]:
+            context += f"- {e.get('title', '?')} on {e.get('start_time', '')[:10]} ({e.get('event_type', 'general')})\n"
+
+    # Past conversation topics
+    if convos:
+        topics = ", ".join([f"\"{c.get('title', 'Untitled')}\" ({c.get('created_at', '')[:10]})" for c in convos])
+        context += f"\n[PAST CONVERSATION TOPICS]\n{topics}\n"
+
+    # Current day context
+    context += f"\n[TODAY]\nCurrent date/time: {now.strftime('%A, %B %d, %Y at %I:%M %p')} UTC\n"
+
+    # Load current conversation history
     if conversation_id:
         conv = await db.conversations.find_one(
             {"conversation_id": conversation_id, "user_id": user_id}, {"_id": 0}
         )
         if conv and conv.get("messages"):
-            context += "\n[CONVERSATION SO FAR]\n"
+            context += "\n[THIS CONVERSATION SO FAR]\n"
             for msg in conv["messages"][-20:]:
                 role = "Mom" if msg["role"] == "user" else "Willow"
                 context += f"{role}: {msg['content']}\n"
@@ -483,7 +667,22 @@ async def send_chat_message(body: ChatMessageRequest, user: dict = Depends(get_c
             {"$set": {"title": title}}
         )
 
+    # Fire-and-forget: extract profile info from this exchange
+    asyncio.create_task(extract_and_update_profile(user_id, body.message, willow_response))
+
     return {"conversation_id": conversation_id, "willow_response": willow_response, "conversation_title": title}
+
+
+# ─── User Profile Route (What Willow Knows) ───
+
+@api_router.get("/profile/willow-memory")
+async def get_willow_memory(user: dict = Depends(get_current_user)):
+    """Returns what Willow remembers about this user — for transparency."""
+    profile = await db.user_profiles.find_one({"user_id": user["user_id"]}, {"_id": 0, "user_id": 0})
+    if not profile:
+        return {"has_profile": False, "message": "Willow is still getting to know you! The more you chat, the better she'll remember."}
+    profile["has_profile"] = True
+    return profile
 
 
 # ─── Journal Routes ───
