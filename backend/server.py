@@ -963,7 +963,8 @@ CALM_CORNER_ACTIVITIES = [
             "Let the sound fill your awareness. Nothing else matters for the next minute.",
             "Breathe naturally. Let your shoulders drop."
         ],
-        "when": "When you need to escape for a moment — in the car, in the bathroom, after bedtime"
+        "when": "When you need to escape for a moment — in the car, in the bathroom, after bedtime",
+        "interactive": True
     }
 ]
 

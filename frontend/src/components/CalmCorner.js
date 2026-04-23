@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Wind, Hand, Paintbrush, Headphones, Eye, ChevronRight, X, ArrowLeft, Play, Pause, RotateCcw } from 'lucide-react';
 import API from '@/config/api';
+import ASMRPlayer from '@/components/ASMRPlayer';
+import ColoringCanvas from '@/components/ColoringCanvas';
 
 const categoryIcons = {
   grounding: Eye,
@@ -121,7 +123,7 @@ function BoxBreathingGuide({ onClose }) {
 }
 
 // ── Activity Detail View ──
-function ActivityDetail({ activity, onBack, onStartBreathing }) {
+function ActivityDetail({ activity, onBack, onStartBreathing, onStartASMR, onStartColoring }) {
   return (
     <div className="animate-fade-in-up" data-testid={`activity-detail-${activity.id}`}>
       <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6 transition-colors" data-testid="back-to-activities">
@@ -163,6 +165,26 @@ function ActivityDetail({ activity, onBack, onStartBreathing }) {
             <Play className="w-4 h-4" /> Start Guided Exercise
           </button>
         )}
+
+        {activity.id === 'asmr_moment' && (
+          <button
+            onClick={onStartASMR}
+            className="mt-6 w-full py-3 bg-[#FFB627] text-white rounded-2xl font-medium hover:bg-[#E5A220] transition-colors flex items-center justify-center gap-2"
+            data-testid="start-asmr-btn"
+          >
+            <Headphones className="w-4 h-4" /> Open Sound Player
+          </button>
+        )}
+
+        {activity.id === 'mini_coloring' && (
+          <button
+            onClick={onStartColoring}
+            className="mt-6 w-full py-3 bg-[#8B5CF6] text-white rounded-2xl font-medium hover:bg-[#7C3AED] transition-colors flex items-center justify-center gap-2"
+            data-testid="start-coloring-btn"
+          >
+            <Paintbrush className="w-4 h-4" /> Start Coloring
+          </button>
+        )}
       </div>
     </div>
   );
@@ -175,6 +197,8 @@ export default function CalmCorner() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showBreathing, setShowBreathing] = useState(false);
+  const [showASMR, setShowASMR] = useState(false);
+  const [showColoring, setShowColoring] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -213,8 +237,12 @@ export default function CalmCorner() {
           activity={selectedActivity}
           onBack={() => setSelectedActivity(null)}
           onStartBreathing={() => setShowBreathing(true)}
+          onStartASMR={() => setShowASMR(true)}
+          onStartColoring={() => setShowColoring(true)}
         />
         {showBreathing && <BoxBreathingGuide onClose={() => setShowBreathing(false)} />}
+        {showASMR && <ASMRPlayer onClose={() => setShowASMR(false)} />}
+        {showColoring && <ColoringCanvas onClose={() => setShowColoring(false)} />}
       </div>
     );
   }
@@ -292,6 +320,8 @@ export default function CalmCorner() {
       </div>
 
       {showBreathing && <BoxBreathingGuide onClose={() => setShowBreathing(false)} />}
+      {showASMR && <ASMRPlayer onClose={() => setShowASMR(false)} />}
+      {showColoring && <ColoringCanvas onClose={() => setShowColoring(false)} />}
     </div>
   );
 }
