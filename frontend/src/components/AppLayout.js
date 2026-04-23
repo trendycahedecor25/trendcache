@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, MessageCircle, BookOpen, Calendar, LogOut, Menu, X, Crown, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, MessageCircle, BookOpen, Calendar, LogOut, Menu, X, Crown, BarChart3, Flower2 } from 'lucide-react';
 import { useState } from 'react';
 
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
@@ -8,6 +8,7 @@ const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/chat', icon: MessageCircle, label: 'Chat with Willow' },
+  { to: '/calm-corner', icon: Flower2, label: 'Calm Corner' },
   { to: '/journal', icon: BookOpen, label: 'Journal' },
   { to: '/calendar', icon: Calendar, label: 'Calendar' },
   { to: '/pricing', icon: Crown, label: 'Premium' },
