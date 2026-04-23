@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
 import { MessageCircle, BookOpen, Calendar, Smile, Frown, Meh, Heart, Sparkles, ArrowRight, Sun, CloudRain, Zap, Coffee, Crown, Loader2 } from 'lucide-react';
 import ReferralSection from '@/components/ReferralSection';
+import WillowMemory from '@/components/WillowMemory';
 
 import API from '@/config/api';
 const WILLOW_AVATAR = "https://static.prod-images.emergentagent.com/jobs/bb8d70a7-15ea-4a51-916d-4d6020add402/images/f5d9020ab42e989571006f0e001a83e2817fbeb73070147d7bafbdf608d5f35d.png";
@@ -313,6 +314,11 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* What Willow Knows About You */}
+      <div className="mt-6">
+        <WillowMemory />
       </div>
 
       {/* Referral Section */}

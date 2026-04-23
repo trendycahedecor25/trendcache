@@ -34,6 +34,13 @@ Web application named "HEARD" designed to support single and unsupported mothers
 - Willow personality overhaul with user-defined tone rules (Feb 2026)
 - Persistent user profile system with auto-extraction after each conversation (Feb 2026)
 - Enhanced context: mood shift detection, journal content, calendar events, day/time awareness
+- "What Willow Knows About Me" dashboard card with expandable categories (Feb 2026)
+
+## Key Components
+- `/app/frontend/src/components/WillowMemory.js` — Dashboard card showing Willow's memory
+- `/app/frontend/src/components/Dashboard.js` — Main dashboard
+- `/app/frontend/src/components/WillowChat.js` — Chat with Willow
+- `/app/backend/server.py` — All backend routes, AI, Stripe, auth
 
 ## Key DB Collections
 - users: user accounts, subscription status, referral codes, admin flag
@@ -56,5 +63,5 @@ Web application named "HEARD" designed to support single and unsupported mothers
 
 ### P2
 - Dedicated Meditation/Video Guides Module
-- "What Willow Knows About Me" card in dashboard (profile transparency)
+- Allow users to edit/correct Willow's memory
 - Backend modularization (server.py ~1190 lines)
