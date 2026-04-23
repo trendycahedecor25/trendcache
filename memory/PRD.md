@@ -6,7 +6,7 @@ Web application named "HEARD" designed to support single and unsupported mothers
 ## Core Requirements
 - Dashboard with mood tracking, journaling (with AI prompts), and calendar
 - Proactive AI (Willow) that learns emotional baseline and remembers past context
-- Calm Corner with micro-mindfulness activities for quick anxiety relief
+- Calm Corner with micro-mindfulness activities + interactive ASMR player + coloring canvas
 - Vibrant, warm, and uplifting UI/UX design
 - Monetization via Stripe subscriptions ($4.99/mo with 7-day free trial)
 - Referral system (Share HEARD, get a free month)
@@ -14,7 +14,7 @@ Web application named "HEARD" designed to support single and unsupported mothers
 - Legal pages (Privacy Policy, Terms of Service)
 
 ## Tech Stack
-- Frontend: React.js, Tailwind CSS, Framer Motion
+- Frontend: React.js, Tailwind CSS, Framer Motion, Web Audio API
 - Backend: FastAPI, PyMongo (Motor async), Emergentintegrations
 - Auth: Emergent-managed Google Auth (JWT via Cookies + localStorage fallback)
 - Payments: Stripe (LIVE key active)
@@ -23,41 +23,29 @@ Web application named "HEARD" designed to support single and unsupported mothers
 
 ## What's Been Implemented
 - Full-stack app with Google Auth, Dashboard, Mood Tracking, Journal (AI prompts), Calendar
-- Willow AI companion with persistent memory system and user profile extraction
+- Willow AI companion with persistent memory, user profile extraction, and full Calm Corner toolkit knowledge
 - Editable "What Willow Knows About Me" card (ChatGPT-style memory editing)
-- Calm Corner with 13 micro-mindfulness activities across 5 categories (grounding, breathing, physical, creative, sensory)
-- Box Breathing guided visual exercise
-- Willow's system prompt includes full Calm Corner toolkit for contextual suggestions
-- Stripe subscriptions (LIVE key active) with checkout and webhooks
-- Referral program with batch lookups
-- Admin analytics dashboard with MongoDB aggregation pipelines
-- Static legal pages (Privacy Policy, Terms of Service)
-- Security: Cryptographically random admin secret
-- Performance: Aggregation pipelines for admin analytics
+- Calm Corner: 13 micro-mindfulness activities across 5 categories
+  - Box Breathing guided visual exercise
+  - ASMR Player with 5 ambient sounds (Web Audio API, no external files)
+  - Coloring Canvas with 2 SVG patterns (mandala, geometric) and 15-color palette
+- Stripe subscriptions (LIVE key) with checkout and webhooks
+- Referral program, Admin analytics dashboard
+- Static legal pages, Security fixes, Performance optimizations
 
-## Key Pages & Components
-- `/dashboard` — Dashboard.js (mood, journal, calendar, Willow memory card)
-- `/chat` — WillowChat.js (Willow AI conversation)
-- `/calm-corner` — CalmCorner.js (micro-mindfulness activities)
-- `/journal` — Journal.js
-- `/calendar` — CalendarView.js
-- `/pricing` — PricingPage.js
-- `/admin` — AdminDashboard.js
-
-## Key API Endpoints
-- `GET /api/calm-corner/activities` — All 13 activities and 5 categories
-- `GET /api/profile/willow-memory` — Get what Willow knows
-- `PUT /api/profile/willow-memory` — Edit memory fields
-- `DELETE /api/profile/willow-memory` — Clear memory fields
-
-## Admin Account
-- Email: tucksmom0527@gmail.com (is_admin: true)
+## Key Components
+- `/app/frontend/src/components/CalmCorner.js` — Calm Corner page
+- `/app/frontend/src/components/ASMRPlayer.js` — Interactive ASMR sound player
+- `/app/frontend/src/components/ColoringCanvas.js` — Interactive SVG coloring canvas
+- `/app/frontend/src/components/WillowMemory.js` — Editable memory card
+- `/app/frontend/src/components/Dashboard.js` — Main dashboard
+- `/app/frontend/src/components/WillowChat.js` — Chat with Willow
+- `/app/backend/server.py` — All backend routes
 
 ## Backlog
 ### P1
 - Community Section for mothers to connect and support each other
 
 ### P2
-- Interactive ASMR audio playback in Calm Corner
-- Interactive coloring canvas in Calm Corner
-- Backend modularization (server.py ~1450 lines)
+- "Quick Calm" floating button for instant crisis grounding
+- Backend modularization (server.py ~1490 lines)
