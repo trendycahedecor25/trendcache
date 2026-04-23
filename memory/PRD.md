@@ -23,39 +23,35 @@ Web application named "HEARD" designed to support single and unsupported mothers
 ## What's Been Implemented
 - Full-stack app with Google Auth, Dashboard, Mood Tracking, Journal (AI prompts), Calendar
 - Willow AI companion with persistent memory system and user profile extraction
+- Editable "What Willow Knows About Me" card (ChatGPT-style memory editing)
 - Stripe subscriptions (LIVE key active) with checkout and webhooks
 - Referral program with batch lookups
 - Admin analytics dashboard with MongoDB aggregation pipelines
 - Static legal pages (Privacy Policy, Terms of Service)
 - Cross-domain auth fix (relative API paths, dual cookie/localStorage)
 - Admin access for tucksmom0527@gmail.com
-- Security fix: Cryptographically random admin secret (Feb 2026)
-- Performance fix: Aggregation pipelines for admin analytics (Feb 2026)
-- Willow personality overhaul with user-defined tone rules (Feb 2026)
-- Persistent user profile system with auto-extraction after each conversation (Feb 2026)
+- Security fix: Cryptographically random admin secret
+- Performance fix: Aggregation pipelines for admin analytics
+- Willow personality overhaul with user-defined tone rules
+- Persistent user profile system with auto-extraction after each conversation
 - Enhanced context: mood shift detection, journal content, calendar events, day/time awareness
-- "What Willow Knows About Me" dashboard card with expandable categories (Feb 2026)
 
 ## Key Components
-- `/app/frontend/src/components/WillowMemory.js` — Dashboard card showing Willow's memory
+- `/app/frontend/src/components/WillowMemory.js` — Editable dashboard card showing Willow's memory
 - `/app/frontend/src/components/Dashboard.js` — Main dashboard
 - `/app/frontend/src/components/WillowChat.js` — Chat with Willow
 - `/app/backend/server.py` — All backend routes, AI, Stripe, auth
 
+## Key API Endpoints
+- `GET /api/profile/willow-memory` — Get what Willow knows
+- `PUT /api/profile/willow-memory` — Edit memory fields
+- `DELETE /api/profile/willow-memory` — Clear memory fields or entire memory
+
 ## Key DB Collections
-- users: user accounts, subscription status, referral codes, admin flag
-- user_profiles: persistent Willow memory (children, schedule, triggers, preferences, key_facts, goals, wins)
-- conversations: chat history with Willow
-- journal_entries: user journals
-- calendar_events: user calendar
-- mood_entries: mood tracking data
-- referrals: referral tracking
-- payment_transactions: Stripe payment records
-- user_sessions: auth sessions
+- users, user_profiles, conversations, journal_entries, calendar_events, mood_entries, referrals, payment_transactions, user_sessions
 
 ## Admin Account
 - Email: tucksmom0527@gmail.com (is_admin: true)
-- Admin secret: stored in backend/.env (ADMIN_SECRET)
 
 ## Backlog
 ### P1
@@ -63,5 +59,4 @@ Web application named "HEARD" designed to support single and unsupported mothers
 
 ### P2
 - Dedicated Meditation/Video Guides Module
-- Allow users to edit/correct Willow's memory
-- Backend modularization (server.py ~1190 lines)
+- Backend modularization (server.py ~1230 lines)
