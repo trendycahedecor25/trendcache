@@ -9,14 +9,14 @@ const PALETTE = [
 ];
 
 const COLORING_PAGES = [
-  { id: 'daisy', name: 'Daisy', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/2f6u7fx2_1.png' },
-  { id: 'butterfly', name: 'Butterfly', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/9fhkmwmc_2.png' },
-  { id: 'lily_valley', name: 'Lily of the Valley', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/qqj3hmhn_3.png' },
-  { id: 'hydrangea', name: 'Hydrangea', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/f519pisk_4.png' },
-  { id: 'hyacinth', name: 'Hyacinth', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/7c306dep_5.png' },
-  { id: 'flower_7', name: 'Wildflower', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/95nzrqe6_7.png' },
-  { id: 'flower_9', name: 'Blossom', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/bzj51o7g_9.png' },
-  { id: 'heart_mandala', name: 'Heart Mandala', url: 'https://customer-assets.emergentagent.com/job_github-explorer-21/artifacts/y78j4dxh_10.png' },
+  { id: 'daisy', name: 'Daisy', url: '/coloring/1.png' },
+  { id: 'butterfly', name: 'Butterfly', url: '/coloring/2.png' },
+  { id: 'lily_valley', name: 'Lily of the Valley', url: '/coloring/3.png' },
+  { id: 'hydrangea', name: 'Hydrangea', url: '/coloring/4.png' },
+  { id: 'hyacinth', name: 'Hyacinth', url: '/coloring/5.png' },
+  { id: 'flower_7', name: 'Wildflower', url: '/coloring/7.png' },
+  { id: 'flower_9', name: 'Blossom', url: '/coloring/9.png' },
+  { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/10.png' },
 ];
 
 const LINE_THRESHOLD = 80;
@@ -87,7 +87,6 @@ export default function ColoringCanvas({ onClose }) {
     const ctx = canvas.getContext('2d');
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const size = Math.min(500, window.innerWidth - 48);
       canvas.width = size;
