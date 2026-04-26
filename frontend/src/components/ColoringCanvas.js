@@ -19,55 +19,74 @@ const COLORING_PAGES = [
   { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/10.png' },
 ];
 
-const LINE_THRESHOLD = 80;
+// Boundary threshold: pixels darker than this are considered "lines" (walls)
+const BOUNDARY_THRESHOLD = 200;
+// How similar a pixel must be to the start pixel to be filled
+const FILL_TOLERANCE = 50;
 
 function floodFill(imageData, startX, startY, fillColor, width, height) {
   const data = imageData.data;
-  const idx = (y, x) => (y * width + x) * 4;
+  const idx = (x, y) => (y * width + x) * 4;
 
-  const startIdx = idx(startY, startX);
-  const startR = data[startIdx];
-  const startG = data[startIdx + 1];
-  const startB = data[startIdx + 2];
+  const si = idx(startX, startY);
+  const startR = data[si];
+  const startG = data[si + 1];
+  const startB = data[si + 2];
 
-  // Don't fill if clicking on a line (dark pixel)
-  const brightness = (startR + startG + startB) / 3;
-  if (brightness < LINE_THRESHOLD) return;
+  // Don't fill if clicking on a dark line
+  const startBrightness = (startR + startG + startB) / 3;
+  if (startBrightness < BOUNDARY_THRESHOLD) return;
 
-  // Don't fill if already the target color
+  // Parse fill color
   const fr = parseInt(fillColor.slice(1, 3), 16);
   const fg = parseInt(fillColor.slice(3, 5), 16);
   const fb = parseInt(fillColor.slice(5, 7), 16);
 
-  if (Math.abs(startR - fr) < 5 && Math.abs(startG - fg) < 5 && Math.abs(startB - fb) < 5) return;
+  // Don't fill if already the target color
+  if (Math.abs(startR - fr) < 10 && Math.abs(startG - fg) < 10 && Math.abs(startB - fb) < 10) return;
 
-  const matchColor = (i) => {
-    const dr = Math.abs(data[i] - startR);
-    const dg = Math.abs(data[i + 1] - startG);
-    const db = Math.abs(data[i + 2] - startB);
-    return dr < 30 && dg < 30 && db < 30;
+  // Check if a pixel is similar enough to the starting pixel to be filled
+  const canFill = (i) => {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    // Must be bright enough (not a line)
+    const brightness = (r + g + b) / 3;
+    if (brightness < BOUNDARY_THRESHOLD) return false;
+    // Must be similar to the starting color
+    const dr = Math.abs(r - startR);
+    const dg = Math.abs(g - startG);
+    const db = Math.abs(b - startB);
+    return dr < FILL_TOLERANCE && dg < FILL_TOLERANCE && db < FILL_TOLERANCE;
   };
 
-  const stack = [[startX, startY]];
+  // Scanline flood fill (much faster than stack-based for large areas)
   const visited = new Uint8Array(width * height);
+  const queue = [[startX, startY]];
+  visited[startY * width + startX] = 1;
 
-  while (stack.length > 0) {
-    const [x, y] = stack.pop();
-    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+  while (queue.length > 0) {
+    const [x, y] = queue.shift();
+    const i = idx(x, y);
 
-    const vi = y * width + x;
-    if (visited[vi]) continue;
-    visited[vi] = 1;
-
-    const i = idx(y, x);
-    if (!matchColor(i)) continue;
-
+    // Fill this pixel
     data[i] = fr;
     data[i + 1] = fg;
     data[i + 2] = fb;
     data[i + 3] = 255;
 
-    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    // Check 4 neighbors
+    const neighbors = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
+    for (const [nx, ny] of neighbors) {
+      if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+      const vi = ny * width + nx;
+      if (visited[vi]) continue;
+      visited[vi] = 1;
+      const ni = idx(nx, ny);
+      if (canFill(ni)) {
+        queue.push([nx, ny]);
+      }
+    }
   }
 }
 
@@ -76,7 +95,7 @@ export default function ColoringCanvas({ onClose }) {
   const [pageIdx, setPageIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef(null);
-  const lineDataRef = useRef(null);
+  const originalDataRef = useRef(null);
 
   const page = COLORING_PAGES[pageIdx];
 
@@ -88,56 +107,37 @@ export default function ColoringCanvas({ onClose }) {
 
     const img = new Image();
     img.onload = () => {
-      const size = Math.min(500, window.innerWidth - 48);
-      canvas.width = size;
-      canvas.height = size;
+      // Use the image's natural dimensions, scaled to fit mobile
+      const maxSize = Math.min(600, window.innerWidth - 64);
+      const scale = Math.min(maxSize / img.width, maxSize / img.height);
+      const w = Math.floor(img.width * scale);
+      const h = Math.floor(img.height * scale);
 
-      // White background first
+      canvas.width = w;
+      canvas.height = h;
+
+      // Draw white background
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, size, size);
+      ctx.fillRect(0, 0, w, h);
 
-      // Draw image centered and scaled
-      const scale = Math.min(size / img.width, size / img.height) * 0.9;
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const x = (size - w) / 2;
-      const y = (size - h) / 2;
-      ctx.drawImage(img, x, y, w, h);
+      // Draw image to fill the canvas
+      ctx.drawImage(img, 0, 0, w, h);
 
-      // Process: make lines dark, background white
-      const imageData = ctx.getImageData(0, 0, size, size);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-        if (brightness < LINE_THRESHOLD) {
-          // Dark pixel = line, make it pure black
-          data[i] = 30;
-          data[i + 1] = 30;
-          data[i + 2] = 30;
-          data[i + 3] = 255;
-        } else {
-          // Light pixel = fillable area, make it white
-          data[i] = 255;
-          data[i + 1] = 255;
-          data[i + 2] = 255;
-          data[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      // Store line data for redraw after fills
-      lineDataRef.current = new Uint8Array(data.length);
-      lineDataRef.current.set(data);
+      // Store original for reset
+      originalDataRef.current = ctx.getImageData(0, 0, w, h).data.slice();
 
       setLoading(false);
     };
     img.onerror = () => {
+      const maxSize = Math.min(500, window.innerWidth - 64);
+      canvas.width = maxSize;
+      canvas.height = maxSize;
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, maxSize, maxSize);
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '14px sans-serif';
+      ctx.font = '16px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Could not load image', canvas.width / 2, canvas.height / 2);
+      ctx.fillText('Could not load image', maxSize / 2, maxSize / 2);
       setLoading(false);
     };
     img.src = url;
@@ -148,6 +148,7 @@ export default function ColoringCanvas({ onClose }) {
   }, [page.url, loadImage]);
 
   const handleCanvasClick = useCallback((e) => {
+    e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const ctx = canvas.getContext('2d');
@@ -157,7 +158,7 @@ export default function ColoringCanvas({ onClose }) {
     const scaleY = canvas.height / rect.height;
 
     let clientX, clientY;
-    if (e.touches) {
+    if (e.touches && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
@@ -172,28 +173,17 @@ export default function ColoringCanvas({ onClose }) {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     floodFill(imageData, x, y, selectedColor, canvas.width, canvas.height);
-
-    // Re-apply lines on top so they're never covered
-    if (lineDataRef.current) {
-      const lines = lineDataRef.current;
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const brightness = (lines[i] + lines[i + 1] + lines[i + 2]) / 3;
-        if (brightness < LINE_THRESHOLD) {
-          data[i] = lines[i];
-          data[i + 1] = lines[i + 1];
-          data[i + 2] = lines[i + 2];
-          data[i + 3] = 255;
-        }
-      }
-    }
-
     ctx.putImageData(imageData, 0, 0);
   }, [selectedColor, loading]);
 
   const reset = useCallback(() => {
-    loadImage(page.url);
-  }, [page.url, loadImage]);
+    const canvas = canvasRef.current;
+    if (!canvas || !originalDataRef.current) return;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    imageData.data.set(originalDataRef.current);
+    ctx.putImageData(imageData, 0, 0);
+  }, []);
 
   const prevPage = () => {
     setPageIdx((pageIdx - 1 + COLORING_PAGES.length) % COLORING_PAGES.length);
@@ -224,7 +214,7 @@ export default function ColoringCanvas({ onClose }) {
         </div>
 
         {/* Canvas */}
-        <div className="bg-[#FFF9F5] rounded-2xl p-3 mb-3 flex items-center justify-center relative">
+        <div className="bg-[#FFF9F5] rounded-2xl p-3 mb-3 flex items-center justify-center relative min-h-[200px]">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-2xl z-10">
               <div className="w-8 h-8 border-3 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
@@ -234,8 +224,7 @@ export default function ColoringCanvas({ onClose }) {
             ref={canvasRef}
             onClick={handleCanvasClick}
             onTouchStart={handleCanvasClick}
-            className="rounded-xl cursor-crosshair touch-none max-w-full"
-            style={{ maxHeight: '400px' }}
+            className="rounded-xl cursor-crosshair touch-none w-full h-auto"
             data-testid="coloring-canvas"
           />
         </div>
@@ -248,7 +237,7 @@ export default function ColoringCanvas({ onClose }) {
               <button
                 key={color}
                 onClick={() => setSelectedColor(color)}
-                className={`w-7 h-7 rounded-full transition-all border ${
+                className={`w-8 h-8 rounded-full transition-all border ${
                   selectedColor === color ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-105'
                 } ${color === '#FFFFFF' ? 'border-slate-300' : 'border-transparent'}`}
                 style={{ backgroundColor: color, ringColor: color === '#FFFFFF' ? '#94a3b8' : color }}
@@ -261,7 +250,7 @@ export default function ColoringCanvas({ onClose }) {
 
         {/* Actions */}
         <div className="flex gap-3">
-          <button onClick={reset} className="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors" data-testid="reset-coloring-btn">
+          <button onClick={reset} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors" data-testid="reset-coloring-btn">
             <RotateCcw className="w-3.5 h-3.5" /> Start Over
           </button>
         </div>
