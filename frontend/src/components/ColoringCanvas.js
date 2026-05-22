@@ -2,21 +2,25 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PALETTE = [
-  '#FF715B', '#FFB627', '#10B981', '#4E9FE5', '#8B5CF6',
-  '#EC4899', '#F97316', '#06B6D4', '#84CC16', '#A855F7',
-  '#F43F5E', '#14B8A6', '#EAB308', '#6366F1', '#D946EF',
+  '#EE1F25', '#E5007A', '#F5B3E6',
+  '#F58723', '#FBC8C8', '#FDF0AD',
+  '#FDEE00', '#F7F7A7', '#B9F57D',
+  '#1F9A34', '#B6F0CF', '#36CEC4',
+  '#182CBF', '#00A9E8', '#B8CAEF',
+  '#7D2EE5', '#BEB2EB', '#C94DB0',
   '#FFFFFF',
 ];
 
 const COLORING_PAGES = [
-  { id: 'daisy', name: 'Daisy', url: '/coloring/1.png' },
-  { id: 'butterfly', name: 'Butterfly', url: '/coloring/2.png' },
-  { id: 'lily_valley', name: 'Lily of the Valley', url: '/coloring/3.png' },
-  { id: 'hydrangea', name: 'Hydrangea', url: '/coloring/4.png' },
-  { id: 'hyacinth', name: 'Hyacinth', url: '/coloring/5.png' },
-  { id: 'flower_7', name: 'Wildflower', url: '/coloring/7.png' },
-  { id: 'flower_9', name: 'Blossom', url: '/coloring/9.png' },
-  { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/10.png' },
+  { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/1.jpg' },
+  { id: 'flower_bouquet', name: 'Flower Bouquet', url: '/coloring/2.jpg' },
+  { id: 'flower_cluster', name: 'Flower Cluster', url: '/coloring/3.jpg' },
+  { id: 'daisy_bunch', name: 'Daisy Bunch', url: '/coloring/5.jpg' },
+  { id: 'flower_heart', name: 'Flower Heart', url: '/coloring/6.jpg' },
+  { id: 'garden_circle', name: 'Garden Circle', url: '/coloring/7.jpg' },
+  { id: 'star_mandala', name: 'Star Mandala', url: '/coloring/8.jpg' },
+  { id: 'lotus', name: 'Lotus', url: '/coloring/9.jpg' },
+  { id: 'greek_sunflower', name: 'Greek Sunflower', url: '/coloring/10.jpg' },
 ];
 
 // Boundary threshold: pixels darker than this are considered "lines" (walls)
