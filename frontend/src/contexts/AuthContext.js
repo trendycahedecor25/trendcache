@@ -1,13 +1,13 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 
 import API from '@/config/api';
 const TOKEN_KEY = 'heard_session_token';
 const AuthContext = createContext(null);
 
-// Axios interceptor: always send token from localStorage as Authorization header
+// Axios interceptor: always send token as Authorization header
 axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = sessionStorage.getItem(TOKEN_KEY);
   if (token && !config.headers['Authorization']) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
@@ -19,31 +19,15 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
     if (window.location.hash?.includes('session_id=')) {
       setLoading(false);
-      return;
-    }
-    // Only check if we have a stored token or cookie
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      // No token stored, try cookie-only auth
-      try {
-        const res = await axios.get(`${API}/auth/me`, { withCredentials: true });
-        setUser(res.data);
-      } catch {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
       return;
     }
     try {
       const res = await axios.get(`${API}/auth/me`, { withCredentials: true });
       setUser(res.data);
     } catch {
-      // Token might be expired, clear it
-      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
       setUser(null);
     } finally {
       setLoading(false);
@@ -54,24 +38,26 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, [checkAuth]);
 
-  const login = (userData, sessionToken) => {
+  const login = useCallback((userData, sessionToken) => {
     if (sessionToken) {
-      localStorage.setItem(TOKEN_KEY, sessionToken);
+      sessionStorage.setItem(TOKEN_KEY, sessionToken);
     }
     setUser(userData);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     } catch { /* ignore */ }
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
     setUser(null);
     window.location.href = '/';
-  };
+  }, []);
+
+  const value = useMemo(() => ({ user, setUser, loading, logout, login, checkAuth }), [user, loading, logout, login, checkAuth]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout, login, checkAuth }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

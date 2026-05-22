@@ -161,8 +161,8 @@ function renderValue(key, value) {
   if (key === 'children' && Array.isArray(value)) {
     return (
       <div className="space-y-1.5">
-        {value.map((child, i) => (
-          <div key={i} className="text-sm text-slate-700">
+        {value.map((child) => (
+          <div key={child.name || Math.random()} className="text-sm text-slate-700">
             <span className="font-medium">{child.name || 'Unknown'}</span>
             {child.age && <span className="text-slate-500"> — age {child.age}</span>}
             {child.details && <span className="text-slate-500"> — {child.details}</span>}
@@ -174,8 +174,8 @@ function renderValue(key, value) {
   if (Array.isArray(value)) {
     return (
       <ul className="space-y-1">
-        {value.map((item, i) => (
-          <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+        {value.map((item) => (
+          <li key={item} className="text-sm text-slate-700 flex items-start gap-2">
             <span className="mt-1.5 w-1 h-1 rounded-full bg-slate-400 shrink-0" />
             {item}
           </li>

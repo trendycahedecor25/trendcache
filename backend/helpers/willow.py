@@ -126,6 +126,61 @@ Fields to extract:
 Return ONLY valid JSON. If nothing new was shared, return {}."""
 
 
+# ── Profile extraction helpers ──
+
+def _parse_llm_json(raw: str) -> dict:
+    """Parse JSON from LLM response, handling markdown code blocks."""
+    clean = raw.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    return json_module.loads(clean)
+
+
+def _merge_children(existing_children: list, new_children: list) -> list:
+    """Merge new children data into existing, updating by name."""
+    kids = {c["name"].lower(): c for c in existing_children if c.get("name")}
+    for kid in new_children:
+        if not kid.get("name"):
+            continue
+        key = kid["name"].lower()
+        if key in kids:
+            kids[key].update({k: v for k, v in kid.items() if v})
+        else:
+            kids[key] = kid
+    return list(kids.values())
+
+
+def _merge_list_field(existing: list, new_items) -> list:
+    """Merge new items into existing list, deduplicating."""
+    result = set(existing)
+    items = new_items if isinstance(new_items, list) else [new_items]
+    for item in items:
+        result.add(item)
+    return list(result)
+
+
+def _merge_profile(profile: dict, extracted: dict) -> dict:
+    """Merge extracted data into existing profile."""
+    if "children" in extracted:
+        extracted["children"] = _merge_children(
+            profile.get("children", []), extracted["children"]
+        )
+
+    for field in ["key_facts", "goals", "wins", "triggers"]:
+        if field in extracted:
+            extracted[field] = _merge_list_field(
+                profile.get(field, []), extracted[field]
+            )
+
+    for field in ["preferred_name", "family_situation", "schedule", "preferences"]:
+        if not extracted.get(field) and field in profile:
+            extracted[field] = profile[field]
+
+    extracted["updated_at"] = datetime.now(timezone.utc).isoformat()
+    extracted["created_at"] = profile.get("created_at", extracted["updated_at"])
+    return extracted
+
+
 async def extract_and_update_profile(user_id: str, user_message: str, willow_response: str):
     """Background task: extract key facts from conversation and update user profile."""
     try:
@@ -139,143 +194,146 @@ async def extract_and_update_profile(user_id: str, user_message: str, willow_res
 
         convo_text = f"Mom: {user_message}\nWillow: {willow_response}"
         raw = await chat.send_message(UserMessage(text=convo_text))
-
-        clean = raw.strip()
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        extracted = json_module.loads(clean)
+        extracted = _parse_llm_json(raw)
 
         if not extracted:
             return
 
-        profile = await db.user_profiles.find_one({"user_id": user_id}, {"_id": 0})
-        if not profile:
-            profile = {"user_id": user_id, "created_at": datetime.now(timezone.utc).isoformat()}
+        profile = await db.user_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {
+            "user_id": user_id, "created_at": datetime.now(timezone.utc).isoformat()
+        }
 
-        if "children" in extracted:
-            existing_kids = {c["name"].lower(): c for c in profile.get("children", []) if c.get("name")}
-            for kid in extracted["children"]:
-                if kid.get("name"):
-                    key = kid["name"].lower()
-                    if key in existing_kids:
-                        existing_kids[key].update({k: v for k, v in kid.items() if v})
-                    else:
-                        existing_kids[key] = kid
-            extracted["children"] = list(existing_kids.values())
-
-        for field in ["key_facts", "goals", "wins", "triggers"]:
-            if field in extracted:
-                existing = set(profile.get(field, []))
-                for item in extracted[field] if isinstance(extracted[field], list) else [extracted[field]]:
-                    existing.add(item)
-                extracted[field] = list(existing)
-
-        for field in ["preferred_name", "family_situation", "schedule", "preferences"]:
-            if field in extracted and extracted[field]:
-                pass
-            elif field in profile:
-                extracted[field] = profile[field]
-
-        extracted["user_id"] = user_id
-        extracted["updated_at"] = datetime.now(timezone.utc).isoformat()
-        if "created_at" not in extracted:
-            extracted["created_at"] = profile.get("created_at", extracted["updated_at"])
+        merged = _merge_profile(profile, extracted)
+        merged["user_id"] = user_id
 
         await db.user_profiles.update_one(
-            {"user_id": user_id},
-            {"$set": extracted},
-            upsert=True
+            {"user_id": user_id}, {"$set": merged}, upsert=True
         )
     except Exception as e:
         logger.warning(f"Profile extraction failed (non-critical): {e}")
 
 
-async def build_willow_context(user_id: str, conversation_id: Optional[str] = None) -> str:
+# ── Context builder helpers ──
+
+async def _fetch_user_data(user_id: str) -> dict:
+    """Fetch all user data needed for context in parallel-safe queries."""
+    now = datetime.now(timezone.utc)
+    week_ahead = (now + timedelta(days=7)).isoformat()
+
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    name = user.get("name", "Mom") if user else "Mom"
-
     profile = await db.user_profiles.find_one({"user_id": user_id}, {"_id": 0})
-
     moods = await db.mood_entries.find(
         {"user_id": user_id}, {"_id": 0}
     ).sort("created_at", -1).limit(14).to_list(14)
-
     convos = await db.conversations.find(
         {"user_id": user_id}, {"_id": 0, "title": 1, "created_at": 1}
     ).sort("created_at", -1).limit(10).to_list(10)
-
     journals = await db.journal_entries.find(
         {"user_id": user_id}, {"_id": 0, "title": 1, "mood": 1, "content": 1, "created_at": 1}
     ).sort("created_at", -1).limit(5).to_list(5)
-
-    now = datetime.now(timezone.utc)
-    week_ahead = (now + timedelta(days=7)).isoformat()
     events = await db.calendar_events.find(
         {"user_id": user_id, "start_time": {"$gte": now.isoformat(), "$lte": week_ahead}},
         {"_id": 0, "title": 1, "start_time": 1, "event_type": 1}
     ).sort("start_time", 1).to_list(20)
 
+    return {
+        "user": user, "profile": profile, "moods": moods,
+        "convos": convos, "journals": journals, "events": events, "now": now,
+    }
+
+
+def _format_profile_context(profile: dict) -> str:
+    """Format user profile into context string."""
+    if not profile:
+        return ""
+    parts = []
+    if profile.get("preferred_name"):
+        parts.append(f"She prefers to be called: {profile['preferred_name']}")
+    if profile.get("children"):
+        kids_str = "; ".join([
+            f"{k.get('name', '?')} (age {k.get('age', '?')}){': ' + k.get('details', '') if k.get('details') else ''}"
+            for k in profile["children"]
+        ])
+        parts.append(f"Her children: {kids_str}")
+    field_labels = {
+        "family_situation": "Family situation",
+        "schedule": "Her schedule",
+        "preferences": "How she likes to be supported",
+    }
+    for field, label in field_labels.items():
+        if profile.get(field):
+            parts.append(f"{label}: {profile[field]}")
+    if profile.get("triggers"):
+        triggers = profile["triggers"] if isinstance(profile["triggers"], list) else [profile["triggers"]]
+        parts.append(f"Known triggers/stressors: {', '.join(triggers)}")
+    if profile.get("key_facts"):
+        parts.append(f"Key facts about her life: {'; '.join(profile['key_facts'][:10])}")
+    for field, label in [("goals", "Goals she's working on"), ("wins", "Recent wins to celebrate")]:
+        if profile.get(field):
+            items = profile[field] if isinstance(profile[field], list) else [profile[field]]
+            parts.append(f"{label}: {', '.join(items[:5])}")
+    return "\n".join(parts) + "\n" if parts else ""
+
+
+def _format_mood_context(moods: list) -> str:
+    """Format mood data with pattern detection."""
+    if not moods:
+        return ""
+    recent = moods[:7]
+    mood_str = ", ".join([f"{m.get('mood_label', '?')} ({m.get('created_at', '')[:10]})" for m in recent])
+    parts = [f"\n[HER RECENT MOODS]\n{mood_str}"]
+
+    avg_mood = sum(m.get("mood_score", 3) for m in moods) / len(moods)
+    recent_avg = sum(m.get("mood_score", 3) for m in recent) / len(recent)
+    parts.append(f"Overall baseline: {avg_mood:.1f}/5 | Recent week: {recent_avg:.1f}/5")
+
+    if len(moods) >= 7 and recent_avg < avg_mood - 0.5:
+        parts.append("** MOOD SHIFT DETECTED: She's been feeling worse than usual recently. Gently check in. **")
+    elif len(moods) >= 7 and recent_avg > avg_mood + 0.5:
+        parts.append("** POSITIVE SHIFT: She's been doing better lately! Celebrate this. **")
+
+    noted = [m for m in recent if m.get("note")]
+    if noted:
+        parts.append("Mood notes: " + "; ".join([f"{m['mood_label']}: \"{m['note']}\"" for m in noted[:3]]))
+    return "\n".join(parts) + "\n"
+
+
+def _format_journal_context(journals: list) -> str:
+    """Format journal entries."""
+    if not journals:
+        return ""
+    parts = ["\n[HER RECENT JOURNAL ENTRIES]"]
+    for j in journals[:3]:
+        preview = (j.get("content", "")[:150] + "...") if len(j.get("content", "")) > 150 else j.get("content", "")
+        parts.append(f"- \"{j.get('title', 'Untitled')}\" (mood: {j.get('mood', 'unset')}, {j.get('created_at', '')[:10]}): {preview}")
+    return "\n".join(parts) + "\n"
+
+
+def _format_schedule_context(events: list) -> str:
+    """Format upcoming calendar events."""
+    if not events:
+        return ""
+    parts = ["\n[HER UPCOMING SCHEDULE]"]
+    for e in events[:7]:
+        parts.append(f"- {e.get('title', '?')} on {e.get('start_time', '')[:10]} ({e.get('event_type', 'general')})")
+    return "\n".join(parts) + "\n"
+
+
+async def build_willow_context(user_id: str, conversation_id: Optional[str] = None) -> str:
+    data = await _fetch_user_data(user_id)
+    name = data["user"].get("name", "Mom") if data["user"] else "Mom"
+
     context = f"\n\n[WHAT YOU KNOW ABOUT HER]\nName: {name}\n"
+    context += _format_profile_context(data["profile"])
+    context += _format_mood_context(data["moods"])
+    context += _format_journal_context(data["journals"])
+    context += _format_schedule_context(data["events"])
 
-    if profile:
-        pname = profile.get("preferred_name")
-        if pname:
-            context += f"She prefers to be called: {pname}\n"
-        if profile.get("children"):
-            kids_str = "; ".join([
-                f"{k.get('name', '?')} (age {k.get('age', '?')}){': ' + k.get('details', '') if k.get('details') else ''}"
-                for k in profile["children"]
-            ])
-            context += f"Her children: {kids_str}\n"
-        if profile.get("family_situation"):
-            context += f"Family situation: {profile['family_situation']}\n"
-        if profile.get("schedule"):
-            context += f"Her schedule: {profile['schedule']}\n"
-        if profile.get("triggers"):
-            triggers = profile["triggers"] if isinstance(profile["triggers"], list) else [profile["triggers"]]
-            context += f"Known triggers/stressors: {', '.join(triggers)}\n"
-        if profile.get("preferences"):
-            context += f"How she likes to be supported: {profile['preferences']}\n"
-        if profile.get("key_facts"):
-            context += f"Key facts about her life: {'; '.join(profile['key_facts'][:10])}\n"
-        if profile.get("goals"):
-            goals = profile["goals"] if isinstance(profile["goals"], list) else [profile["goals"]]
-            context += f"Goals she's working on: {', '.join(goals[:5])}\n"
-        if profile.get("wins"):
-            wins = profile["wins"] if isinstance(profile["wins"], list) else [profile["wins"]]
-            context += f"Recent wins to celebrate: {', '.join(wins[:5])}\n"
-
-    if moods:
-        recent_moods = moods[:7]
-        mood_str = ", ".join([f"{m.get('mood_label', '?')} ({m.get('created_at', '')[:10]})" for m in recent_moods])
-        context += f"\n[HER RECENT MOODS]\n{mood_str}\n"
-        avg_mood = sum(m.get("mood_score", 3) for m in moods) / len(moods)
-        recent_avg = sum(m.get("mood_score", 3) for m in recent_moods) / len(recent_moods)
-        context += f"Overall baseline: {avg_mood:.1f}/5 | Recent week: {recent_avg:.1f}/5\n"
-        if len(moods) >= 7 and recent_avg < avg_mood - 0.5:
-            context += "** MOOD SHIFT DETECTED: She's been feeling worse than usual recently. Gently check in. **\n"
-        elif len(moods) >= 7 and recent_avg > avg_mood + 0.5:
-            context += "** POSITIVE SHIFT: She's been doing better lately! Celebrate this. **\n"
-        noted_moods = [m for m in recent_moods if m.get("note")]
-        if noted_moods:
-            context += "Mood notes: " + "; ".join([f"{m['mood_label']}: \"{m['note']}\"" for m in noted_moods[:3]]) + "\n"
-
-    if journals:
-        context += "\n[HER RECENT JOURNAL ENTRIES]\n"
-        for j in journals[:3]:
-            content_preview = (j.get("content", "")[:150] + "...") if len(j.get("content", "")) > 150 else j.get("content", "")
-            context += f"- \"{j.get('title', 'Untitled')}\" (mood: {j.get('mood', 'unset')}, {j.get('created_at', '')[:10]}): {content_preview}\n"
-
-    if events:
-        context += "\n[HER UPCOMING SCHEDULE]\n"
-        for e in events[:7]:
-            context += f"- {e.get('title', '?')} on {e.get('start_time', '')[:10]} ({e.get('event_type', 'general')})\n"
-
-    if convos:
-        topics = ", ".join([f"\"{c.get('title', 'Untitled')}\" ({c.get('created_at', '')[:10]})" for c in convos])
+    if data["convos"]:
+        topics = ", ".join([f"\"{c.get('title', 'Untitled')}\" ({c.get('created_at', '')[:10]})" for c in data["convos"]])
         context += f"\n[PAST CONVERSATION TOPICS]\n{topics}\n"
 
-    context += f"\n[TODAY]\nCurrent date/time: {now.strftime('%A, %B %d, %Y at %I:%M %p')} UTC\n"
+    context += f"\n[TODAY]\nCurrent date/time: {data['now'].strftime('%A, %B %d, %Y at %I:%M %p')} UTC\n"
 
     if conversation_id:
         conv = await db.conversations.find_one(

@@ -76,15 +76,14 @@ export default function WillowChat() {
       hasInitSent.current = true;
       sendMessage(initialMessage);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage]);
+  }, [initialMessage, sendMessage]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
-  const sendMessage = async (text) => {
+  const sendMessage = useCallback(async (text) => {
     const msgText = text || input.trim();
     if (!msgText || sending) return;
     setInput('');
@@ -121,7 +120,7 @@ export default function WillowChat() {
     } finally {
       setSending(false);
     }
-  };
+  }, [input, sending, activeConvoId, navigate]);
 
   const startNewChat = () => {
     setActiveConvoId(null);

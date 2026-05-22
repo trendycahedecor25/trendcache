@@ -157,9 +157,9 @@ export default function CalendarView() {
                   <span>{day}</span>
                   {dayEvents.length > 0 && (
                     <div className="flex gap-0.5 mt-1">
-                      {dayEvents.slice(0, 3).map((e, i) => (
+                      {dayEvents.slice(0, 3).map((e) => (
                         <div
-                          key={i}
+                          key={e.event_id || e.title}
                           className="w-1.5 h-1.5 rounded-full"
                           style={{ background: selected ? 'white' : (eventTypeColors[e.event_type] || '#64748B') }}
                         />

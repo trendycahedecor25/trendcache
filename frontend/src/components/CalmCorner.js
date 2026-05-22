@@ -21,12 +21,13 @@ function BoxBreathingGuide({ onClose }) {
   const [running, setRunning] = useState(false);
   const timerRef = useRef(null);
 
-  const phases = [
+  const phasesRef = useRef([
     { key: 'inhale', label: 'Breathe In', color: '#4E9FE5' },
     { key: 'hold1', label: 'Hold', color: '#10B981' },
     { key: 'exhale', label: 'Breathe Out', color: '#8B5CF6' },
     { key: 'hold2', label: 'Hold', color: '#FFB627' },
-  ];
+  ]);
+  const phases = phasesRef.current;
 
   const cleanup = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);

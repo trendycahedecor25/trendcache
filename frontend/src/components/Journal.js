@@ -124,7 +124,7 @@ export default function Journal() {
           <div className="space-y-2">
             {prompts.map((p, i) => (
               <button
-                key={i}
+                key={`prompt-${p.slice(0, 20)}`}
                 onClick={() => { setTitle(''); setContent(''); setShowEditor(true); setContent(p); }}
                 className="w-full text-left px-4 py-3 rounded-xl bg-white/80 border border-white hover:border-[#FFB627]/20 text-sm text-slate-700 hover:text-slate-900 transition-all"
                 data-testid={`prompt-${i}`}
