@@ -115,23 +115,25 @@ export default function AppLayout({ children }) {
       )}
 
       {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-40 flex items-center justify-around py-2 px-2" data-testid="bottom-nav">
-        {navItems.map((item) => {
-          const isActive = location.pathname.startsWith(item.to);
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
-                isActive ? 'text-[#FF715B]' : 'text-slate-400'
-              }`}
-              data-testid={`bottom-nav-${item.label.toLowerCase().replace(/ /g, '-')}`}
-            >
-              <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{item.label.split(' ')[0]}</span>
-            </NavLink>
-          );
-        })}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-[60] overflow-x-auto scrollbar-hide" data-testid="bottom-nav" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="flex items-center py-2 px-2 pr-52 min-w-max">
+          {navItems.map((item) => {
+            const isActive = location.pathname.startsWith(item.to);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl transition-all shrink-0 ${
+                  isActive ? 'text-[#FF715B]' : 'text-slate-400'
+                }`}
+                data-testid={`bottom-nav-${item.label.toLowerCase().replace(/ /g, '-')}`}
+              >
+                <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                <span className="text-[10px] font-medium whitespace-nowrap">{item.label.split(' ')[0]}</span>
+              </NavLink>
+            );
+          })}
+        </div>
       </nav>
 
       {/* Main Content */}

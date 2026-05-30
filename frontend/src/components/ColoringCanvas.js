@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, RotateCcw, ChevronLeft, ChevronRight, Eraser } from 'lucide-react';
 
 const PALETTE = [
   '#FF0000', '#FF00A8', '#FFD4F8',
@@ -8,7 +8,6 @@ const PALETTE = [
   '#00A000', '#C2FFC6', '#00FFB3',
   '#0000FF', '#00A8FF', '#C6DAFF',
   '#6900FF', '#BD99FF', '#C647FF',
-  '#FFFFFF',
 ];
 
 const COLORING_PAGES = [
@@ -23,10 +22,14 @@ const COLORING_PAGES = [
   { id: 'lotus_bloom', name: 'Lotus Bloom', url: '/coloring/9.jpg' },
 ];
 
-// Boundary threshold: pixels darker than this are considered "lines" (walls)
-const BOUNDARY_THRESHOLD = 200;
+// Line detection: a pixel is a "line" only if ALL channels are dark
+const LINE_THRESHOLD = 80;
 // How similar a pixel must be to the start pixel to be filled
 const FILL_TOLERANCE = 50;
+
+function isLinePx(r, g, b) {
+  return r < LINE_THRESHOLD && g < LINE_THRESHOLD && b < LINE_THRESHOLD;
+}
 
 function floodFill(imageData, startX, startY, fillColor, width, height) {
   const data = imageData.data;
@@ -37,9 +40,8 @@ function floodFill(imageData, startX, startY, fillColor, width, height) {
   const startG = data[si + 1];
   const startB = data[si + 2];
 
-  // Don't fill if clicking on a dark line
-  const startBrightness = (startR + startG + startB) / 3;
-  if (startBrightness < BOUNDARY_THRESHOLD) return;
+  // Don't fill if clicking on a black line
+  if (isLinePx(startR, startG, startB)) return;
 
   // Parse fill color
   const fr = parseInt(fillColor.slice(1, 3), 16);
@@ -49,14 +51,12 @@ function floodFill(imageData, startX, startY, fillColor, width, height) {
   // Don't fill if already the target color
   if (Math.abs(startR - fr) < 10 && Math.abs(startG - fg) < 10 && Math.abs(startB - fb) < 10) return;
 
-  // Check if a pixel is similar enough to the starting pixel to be filled
   const canFill = (i) => {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
-    // Must be bright enough (not a line)
-    const brightness = (r + g + b) / 3;
-    if (brightness < BOUNDARY_THRESHOLD) return false;
+    // Lines (all channels dark) are walls
+    if (isLinePx(r, g, b)) return false;
     // Must be similar to the starting color
     const dr = Math.abs(r - startR);
     const dg = Math.abs(g - startG);
@@ -64,7 +64,6 @@ function floodFill(imageData, startX, startY, fillColor, width, height) {
     return dr < FILL_TOLERANCE && dg < FILL_TOLERANCE && db < FILL_TOLERANCE;
   };
 
-  // Scanline flood fill (much faster than stack-based for large areas)
   const visited = new Uint8Array(width * height);
   const queue = [[startX, startY]];
   visited[startY * width + startX] = 1;
@@ -73,13 +72,11 @@ function floodFill(imageData, startX, startY, fillColor, width, height) {
     const [x, y] = queue.shift();
     const i = idx(x, y);
 
-    // Fill this pixel
     data[i] = fr;
     data[i + 1] = fg;
     data[i + 2] = fb;
     data[i + 3] = 255;
 
-    // Check 4 neighbors
     const neighbors = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]];
     for (const [nx, ny] of neighbors) {
       if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
@@ -96,12 +93,14 @@ function floodFill(imageData, startX, startY, fillColor, width, height) {
 
 export default function ColoringCanvas({ onClose }) {
   const [selectedColor, setSelectedColor] = useState(PALETTE[0]);
+  const [isEraser, setIsEraser] = useState(false);
   const [pageIdx, setPageIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef(null);
   const originalDataRef = useRef(null);
 
   const page = COLORING_PAGES[pageIdx];
+  const activeColor = isEraser ? '#FFFFFF' : selectedColor;
 
   const loadImage = useCallback((url) => {
     setLoading(true);
@@ -111,29 +110,25 @@ export default function ColoringCanvas({ onClose }) {
 
     const img = new Image();
     img.onload = () => {
-      // Use the image's natural dimensions, scaled to fit mobile
-      const maxSize = Math.min(600, window.innerWidth - 64);
-      const scale = Math.min(maxSize / img.width, maxSize / img.height);
+      // Full screen: use available viewport size
+      const maxW = window.innerWidth - 16;
+      const maxH = window.innerHeight - 200; // leave room for toolbar
+      const scale = Math.min(maxW / img.width, maxH / img.height);
       const w = Math.floor(img.width * scale);
       const h = Math.floor(img.height * scale);
 
       canvas.width = w;
       canvas.height = h;
 
-      // Draw white background
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, w, h);
-
-      // Draw image to fill the canvas
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Store original for reset
       originalDataRef.current = ctx.getImageData(0, 0, w, h).data.slice();
-
       setLoading(false);
     };
     img.onerror = () => {
-      const maxSize = Math.min(500, window.innerWidth - 64);
+      const maxSize = Math.min(500, window.innerWidth - 32);
       canvas.width = maxSize;
       canvas.height = maxSize;
       ctx.fillStyle = '#FFFFFF';
@@ -176,9 +171,9 @@ export default function ColoringCanvas({ onClose }) {
     if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return;
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    floodFill(imageData, x, y, selectedColor, canvas.width, canvas.height);
+    floodFill(imageData, x, y, activeColor, canvas.width, canvas.height);
     ctx.putImageData(imageData, 0, 0);
-  }, [selectedColor, loading]);
+  }, [activeColor, loading]);
 
   const reset = useCallback(() => {
     const canvas = canvasRef.current;
@@ -196,67 +191,87 @@ export default function ColoringCanvas({ onClose }) {
     setPageIdx((pageIdx + 1) % COLORING_PAGES.length);
   };
 
+  const selectColor = (color) => {
+    setSelectedColor(color);
+    setIsEraser(false);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" data-testid="coloring-canvas-modal">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-5 relative max-h-[95vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-3 right-3 p-2 rounded-xl hover:bg-slate-100 z-10" data-testid="close-coloring-canvas">
-          <X className="w-5 h-5 text-slate-400" />
+    <div className="fixed inset-0 z-[70] bg-white flex flex-col" data-testid="coloring-canvas-modal">
+      {/* Top toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white shrink-0">
+        <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100" data-testid="close-coloring-canvas">
+          <X className="w-5 h-5 text-slate-500" />
         </button>
 
-        <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 mb-0.5">Mini Coloring</h3>
-        <p className="text-xs text-slate-500 mb-3">Pick a color, tap to fill. No rules.</p>
-
-        {/* Page selector */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1">
           <button onClick={prevPage} className="p-1.5 rounded-lg hover:bg-slate-100" data-testid="prev-page-btn">
             <ChevronLeft className="w-5 h-5 text-slate-500" />
           </button>
-          <span className="text-sm font-medium text-slate-700">{page.name} <span className="text-slate-400">({pageIdx + 1}/{COLORING_PAGES.length})</span></span>
+          <span className="text-sm font-medium text-slate-700 min-w-[120px] text-center">
+            {page.name} <span className="text-slate-400 text-xs">({pageIdx + 1}/{COLORING_PAGES.length})</span>
+          </span>
           <button onClick={nextPage} className="p-1.5 rounded-lg hover:bg-slate-100" data-testid="next-page-btn">
             <ChevronRight className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
-        {/* Canvas */}
-        <div className="bg-[#FFF9F5] rounded-2xl p-3 mb-3 flex items-center justify-center relative min-h-[200px]">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-2xl z-10">
-              <div className="w-8 h-8 border-3 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
-            onTouchStart={handleCanvasClick}
-            className="rounded-xl cursor-crosshair touch-none w-full h-auto"
-            data-testid="coloring-canvas"
-          />
-        </div>
+        <button onClick={reset} className="p-2 rounded-xl hover:bg-slate-100" data-testid="reset-coloring-btn" title="Start Over">
+          <RotateCcw className="w-5 h-5 text-slate-500" />
+        </button>
+      </div>
 
-        {/* Color palette */}
-        <div className="mb-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Pick a color</p>
-          <div className="flex flex-wrap gap-2" data-testid="color-palette">
-            {PALETTE.map((color) => (
-              <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                className={`w-8 h-8 rounded-full transition-all border ${
-                  selectedColor === color ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-105'
-                } ${color === '#FFFFFF' ? 'border-slate-300' : 'border-transparent'}`}
-                style={{ backgroundColor: color, ringColor: color === '#FFFFFF' ? '#94a3b8' : color }}
-                data-testid={`palette-color-${color.replace('#', '')}`}
-                title={color === '#FFFFFF' ? 'Eraser (white)' : color}
-              />
-            ))}
+      {/* Canvas area - fills available space */}
+      <div className="flex-1 flex items-center justify-center bg-[#FFF9F5] overflow-hidden relative p-2">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+            <div className="w-8 h-8 border-3 border-[#8B5CF6] border-t-transparent rounded-full animate-spin" />
           </div>
-        </div>
+        )}
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          onTouchStart={handleCanvasClick}
+          className="rounded-lg cursor-crosshair touch-none max-w-full max-h-full"
+          data-testid="coloring-canvas"
+        />
+      </div>
 
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button onClick={reset} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors" data-testid="reset-coloring-btn">
-            <RotateCcw className="w-3.5 h-3.5" /> Start Over
+      {/* Bottom color palette */}
+      <div className="shrink-0 bg-white border-t border-slate-100 px-3 pt-2 pb-14" data-testid="color-palette-bar">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pr-36" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {/* Eraser button */}
+          <button
+            onClick={() => setIsEraser(true)}
+            className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all border ${
+              isEraser
+                ? 'ring-2 ring-offset-2 ring-slate-400 scale-110 bg-white border-slate-300'
+                : 'hover:scale-105 bg-slate-50 border-slate-200'
+            }`}
+            data-testid="eraser-btn"
+            title="Eraser"
+          >
+            <Eraser className="w-4 h-4 text-slate-500" />
           </button>
+
+          <div className="w-px h-7 bg-slate-200 shrink-0 mx-0.5" />
+
+          {/* Color swatches */}
+          {PALETTE.map((color) => (
+            <button
+              key={color}
+              onClick={() => selectColor(color)}
+              className={`shrink-0 w-9 h-9 rounded-full transition-all border ${
+                !isEraser && selectedColor === color ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-105'
+              } border-transparent`}
+              style={{
+                backgroundColor: color,
+                '--tw-ring-color': color,
+              }}
+              data-testid={`palette-color-${color.replace('#', '')}`}
+              title={color}
+            />
+          ))}
         </div>
       </div>
     </div>
