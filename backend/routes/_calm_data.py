@@ -188,15 +188,15 @@ CALM_CORNER_ACTIVITIES = [
     },
     {
         "id": "asmr_moment",
-        "title": "ASMR Moment",
+        "title": "Nature Sounds",
         "category": "sensory",
-        "duration": "1-2 min",
-        "description": "Short calming sounds — rain, crackling fire, soft whispers, ocean waves. Put in earbuds and let your nervous system settle for just a minute or two.",
+        "duration": "1-5 min",
+        "description": "Real creek recordings — babbling brooks, gentle trickles, flowing streams with birdsong. Put in earbuds and let nature settle your nervous system.",
         "steps": [
             "Put in earbuds if you can, or play softly on your phone",
-            "Pick a sound that appeals to you — rain, fire, ocean, or whispers",
+            "Pick a creek sound that calls to you",
             "Close your eyes and just listen",
-            "Let the sound fill your awareness. Nothing else matters for the next minute.",
+            "Let the water sounds fill your awareness. Nothing else matters right now.",
             "Breathe naturally. Let your shoulders drop."
         ],
         "when": "When you need to escape for a moment — in the car, in the bathroom, after bedtime",

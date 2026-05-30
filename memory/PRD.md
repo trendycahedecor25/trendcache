@@ -31,23 +31,18 @@ backend/
 - Full-stack app with Google Auth, Dashboard, Mood Tracking, Journal (AI prompts), Calendar
 - Willow AI companion with persistent memory, profile extraction, Calm Corner toolkit
 - Editable "What Willow Knows About Me" card (ChatGPT-style memory editing)
-- Calm Corner: 13 micro-mindfulness activities, ASMR Player (Web Audio API)
-- Coloring Canvas: 9 custom pages, 18 custom colors from user's dot palette, full-screen on mobile, recoloring support, eraser tool
+- Calm Corner: 13 micro-mindfulness activities
+- Nature Sounds player: 5 real creek recordings from user's personal videos (replaced Web Audio API generated noise)
+  - Creek & Birdsong, Babbling Brook, Flowing Stream, Gentle Trickle, Creek Ambiance
+- Coloring Canvas: 9 custom pages, 18 custom colors, full-screen on mobile, recoloring + eraser
 - Stripe subscriptions (LIVE key) with checkout and webhooks
 - Referral program, Admin analytics dashboard (aggregation pipelines)
 - Legal pages, Security fixes (cryptographic admin secret, sessionStorage for tokens)
-- Code review fixes: hook deps, complexity refactoring, array keys, useMemo context
 - Mobile fixes: scrollable bottom nav (accounts for Emergent badge), full-screen coloring canvas
 
 ## Admin
 - Email: tucksmom0527@gmail.com (is_admin: true on both preview and production)
 - Production URL: https://willowhears.me
-
-## Key Bug Fixes (May 30, 2026)
-- Fixed mobile bottom nav: rightmost items hidden by Emergent badge → made nav scrollable with right padding
-- Fixed coloring canvas: too small on mobile → full-screen layout
-- Fixed flood-fill recolor: saturated colors (red/blue/green) couldn't be recolored → changed line detection from avg brightness to max-channel check
-- Added eraser tool to coloring palette
 
 ## Backlog
 ### P1
