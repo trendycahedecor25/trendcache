@@ -2,25 +2,25 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PALETTE = [
-  '#EE1F25', '#E5007A', '#F5B3E6',
-  '#F58723', '#FBC8C8', '#FDF0AD',
-  '#FDEE00', '#F7F7A7', '#B9F57D',
-  '#1F9A34', '#B6F0CF', '#36CEC4',
-  '#182CBF', '#00A9E8', '#B8CAEF',
-  '#7D2EE5', '#BEB2EB', '#C94DB0',
+  '#FF0000', '#FF00A8', '#FFD4F8',
+  '#FF9900', '#FFC6B0', '#FFF3B3',
+  '#E9FF00', '#FCFFC2', '#AEFF7C',
+  '#00A000', '#C2FFC6', '#00FFB3',
+  '#0000FF', '#00A8FF', '#C6DAFF',
+  '#6900FF', '#BD99FF', '#C647FF',
   '#FFFFFF',
 ];
 
 const COLORING_PAGES = [
-  { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/1.jpg' },
-  { id: 'flower_bouquet', name: 'Flower Bouquet', url: '/coloring/2.jpg' },
-  { id: 'flower_cluster', name: 'Flower Cluster', url: '/coloring/3.jpg' },
-  { id: 'daisy_bunch', name: 'Daisy Bunch', url: '/coloring/5.jpg' },
+  { id: 'floral_bouquet', name: 'Floral Bouquet', url: '/coloring/1.jpg' },
+  { id: 'heart_mandala', name: 'Heart Mandala', url: '/coloring/2.jpg' },
+  { id: 'flower_mandala', name: 'Flower Mandala', url: '/coloring/3.jpg' },
+  { id: 'mandala_pattern', name: 'Mandala Pattern', url: '/coloring/4.jpg' },
+  { id: 'greek_mandala', name: 'Greek Mandala', url: '/coloring/5.jpg' },
   { id: 'flower_heart', name: 'Flower Heart', url: '/coloring/6.jpg' },
-  { id: 'garden_circle', name: 'Garden Circle', url: '/coloring/7.jpg' },
-  { id: 'star_mandala', name: 'Star Mandala', url: '/coloring/8.jpg' },
-  { id: 'lotus', name: 'Lotus', url: '/coloring/9.jpg' },
-  { id: 'greek_sunflower', name: 'Greek Sunflower', url: '/coloring/10.jpg' },
+  { id: 'ornate_mandala', name: 'Ornate Mandala', url: '/coloring/7.jpg' },
+  { id: 'flower_circle', name: 'Flower Circle', url: '/coloring/8.jpg' },
+  { id: 'lotus_bloom', name: 'Lotus Bloom', url: '/coloring/9.jpg' },
 ];
 
 // Boundary threshold: pixels darker than this are considered "lines" (walls)
