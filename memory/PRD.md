@@ -32,17 +32,24 @@ backend/
 - Willow AI companion with persistent memory, profile extraction, Calm Corner toolkit
 - Editable "What Willow Knows About Me" card (ChatGPT-style memory editing)
 - Calm Corner: 13 micro-mindfulness activities
-- Nature Sounds player: 5 real creek recordings from user's personal videos (replaced Web Audio API generated noise)
-  - Creek & Birdsong, Babbling Brook, Flowing Stream, Gentle Trickle, Creek Ambiance
+- Nature Sounds player: 5 real creek recordings from user's personal videos
 - Coloring Canvas: 9 custom pages, 18 custom colors, full-screen on mobile, recoloring + eraser
 - Stripe subscriptions (LIVE key) with checkout and webhooks
 - Referral program, Admin analytics dashboard (aggregation pipelines)
 - Legal pages, Security fixes (cryptographic admin secret, sessionStorage for tokens)
 - Mobile fixes: scrollable bottom nav (accounts for Emergent badge), full-screen coloring canvas
+- Two rounds of code review fixes applied (hooks, array keys, error handlers, complexity)
 
 ## Admin
 - Email: tucksmom0527@gmail.com (is_admin: true on both preview and production)
 - Production URL: https://willowhears.me
+
+## Code Review Fixes Applied (Latest)
+- Fixed React hook dependency ordering (sendMessage useCallback defined before useEffect that references it)
+- Replaced all index-as-key with stable keys (WillowChat, WillowMemory, ReferralSection, PricingPage, AdminDashboard, CalmCorner)
+- Added error logging to all empty catch blocks (AuthContext, ReferralSection)
+- Added useCallback import to WillowChat
+- Python `is None` checks confirmed correct per PEP 8 (singleton comparison)
 
 ## Backlog
 ### P1

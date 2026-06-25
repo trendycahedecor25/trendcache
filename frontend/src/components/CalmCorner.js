@@ -144,7 +144,7 @@ function ActivityDetail({ activity, onBack, onStartBreathing, onStartASMR, onSta
           <h4 className="font-['Outfit'] font-semibold text-slate-900 mb-4">How to do it:</h4>
           <ol className="space-y-3">
             {activity.steps.map((step, i) => (
-              <li key={i} className="flex gap-3">
+              <li key={`step-${i}`} className="flex gap-3">
                 <span className="w-6 h-6 rounded-full bg-[#FF715B]/10 text-[#FF715B] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                 <p className="text-sm text-slate-700">{step}</p>
               </li>

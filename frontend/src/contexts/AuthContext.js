@@ -26,7 +26,8 @@ export function AuthProvider({ children }) {
     try {
       const res = await axios.get(`${API}/auth/me`, { withCredentials: true });
       setUser(res.data);
-    } catch {
+    } catch (err) {
+      console.error('Auth check failed:', err);
       sessionStorage.removeItem(TOKEN_KEY);
       setUser(null);
     } finally {
@@ -48,7 +49,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
-    } catch { /* ignore */ }
+    } catch (err) { console.error('Logout error:', err); }
     sessionStorage.removeItem(TOKEN_KEY);
     setUser(null);
     window.location.href = '/';

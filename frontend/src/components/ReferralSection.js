@@ -35,7 +35,7 @@ export default function ReferralSection() {
           text: "I found this amazing app that's helped me so much as a mom. Willow is like having a supportive friend who's always there. Try it free!",
           url: referralLink
         });
-      } catch { /* user cancelled */ }
+      } catch (err) { console.error('Share cancelled or failed:', err); }
     } else {
       copyLink();
     }
@@ -109,8 +109,8 @@ export default function ReferralSection() {
           </button>
           {showDetails && (
             <div className="mt-2 space-y-2">
-              {referralInfo.referrals.map((r, i) => (
-                <div key={i} className="flex items-center justify-between bg-white/80 rounded-lg px-3 py-2">
+              {referralInfo.referrals.map((r) => (
+                <div key={r.name + r.date} className="flex items-center justify-between bg-white/80 rounded-lg px-3 py-2">
                   <span className="text-xs text-slate-700 font-medium">{r.name}</span>
                   <span className="text-[10px] text-slate-400">{r.date ? new Date(r.date).toLocaleDateString() : ''}</span>
                 </div>

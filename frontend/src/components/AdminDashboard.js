@@ -94,8 +94,8 @@ export default function AdminDashboard() {
             <UserPlus className="w-5 h-5 text-[#FF715B]" /> Recent Signups
           </h3>
           <div className="space-y-3 max-h-80 overflow-y-auto">
-            {recent_signups.map((u, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+            {recent_signups.map((u) => (
+              <div key={u.email || u.user_id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
                 <div>
                   <p className="text-sm font-medium text-slate-800">{u.name || 'Anonymous'}</p>
                   <p className="text-xs text-slate-400">{u.email}</p>
@@ -122,11 +122,11 @@ export default function AdminDashboard() {
             <TrendingUp className="w-5 h-5 text-[#8B5CF6]" /> Top Referrers
           </h3>
           <div className="space-y-3">
-            {referrals.top_referrers.map((r, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
+            {referrals.top_referrers.map((r, idx) => (
+              <div key={r.email} className="flex items-center justify-between p-3 rounded-xl bg-slate-50">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF715B] to-[#FFB627] flex items-center justify-center text-white text-xs font-bold">
-                    #{i + 1}
+                    #{idx + 1}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-800">{r.name}</p>

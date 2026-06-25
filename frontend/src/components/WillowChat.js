@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Send, Plus, MessageCircle, Loader2, ChevronLeft, Crown } from 'lucide-react';
@@ -70,19 +70,6 @@ export default function WillowChat() {
       .catch(console.error);
   }, [activeConvoId]);
 
-  // Handle initial message from quick action
-  useEffect(() => {
-    if (initialMessage && !hasInitSent.current) {
-      hasInitSent.current = true;
-      sendMessage(initialMessage);
-    }
-  }, [initialMessage, sendMessage]);
-
-  // Auto-scroll
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
-
   const sendMessage = useCallback(async (text) => {
     const msgText = text || input.trim();
     if (!msgText || sending) return;
@@ -121,6 +108,19 @@ export default function WillowChat() {
       setSending(false);
     }
   }, [input, sending, activeConvoId, navigate]);
+
+  // Handle initial message from quick action
+  useEffect(() => {
+    if (initialMessage && !hasInitSent.current) {
+      hasInitSent.current = true;
+      sendMessage(initialMessage);
+    }
+  }, [initialMessage, sendMessage]);
+
+  // Auto-scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sending]);
 
   const startNewChat = () => {
     setActiveConvoId(null);
@@ -214,7 +214,7 @@ export default function WillowChat() {
               </div>
             </div>
           )}
-          {messages.map((msg, i) => <ChatMessage key={i} msg={msg} />)}
+          {messages.map((msg) => <ChatMessage key={msg.timestamp + msg.role} msg={msg} />)}
           {sending && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>

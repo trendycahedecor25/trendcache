@@ -62,7 +62,7 @@ function ArrayEditor({ items, onSave, onCancel }) {
   return (
     <div className="mt-1 space-y-2">
       {list.map((item, i) => (
-        <div key={i} className="flex items-center gap-2">
+        <div key={`item-${i}-${item}`} className="flex items-center gap-2">
           <input
             value={item}
             onChange={(e) => updateItem(i, e.target.value)}
@@ -113,7 +113,7 @@ function ChildrenEditor({ children, onSave, onCancel }) {
   return (
     <div className="mt-1 space-y-3">
       {kids.map((kid, i) => (
-        <div key={i} className="flex items-start gap-2 bg-slate-50 rounded-xl p-3">
+        <div key={`kid-${i}-${kid.name}`} className="flex items-start gap-2 bg-slate-50 rounded-xl p-3">
           <div className="flex-1 space-y-2">
             <input
               value={kid.name || ''}

@@ -78,8 +78,8 @@ export default function PricingPage() {
             <span className="text-slate-400 text-sm ml-1">/forever</span>
           </div>
           <div className="space-y-3 mb-8">
-            {freeFeatures.map((f, i) => (
-              <div key={i} className="flex items-center gap-3">
+            {freeFeatures.map((f) => (
+              <div key={f.text} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
                   <f.icon className="w-3 h-3 text-slate-500" />
                 </div>
@@ -114,8 +114,8 @@ export default function PricingPage() {
           </div>
           <p className="text-[#10B981] text-xs font-medium mb-6">7-day free trial included</p>
           <div className="space-y-3 mb-8">
-            {premiumFeatures.map((f, i) => (
-              <div key={i} className="flex items-center gap-3">
+            {premiumFeatures.map((f) => (
+              <div key={f.text} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-[#FF715B]/10 flex items-center justify-center flex-shrink-0">
                   <f.icon className="w-3 h-3 text-[#FF715B]" />
                 </div>
@@ -152,8 +152,8 @@ export default function PricingPage() {
             { q: "Can I cancel anytime?", a: "Absolutely. No commitments, no hidden fees. You can manage your subscription at any time." },
             { q: "What if I can't afford it right now?", a: "We get it, truly. The free tier gives you 3 Willow conversations a day, basic journal, and calendar — you're always welcome here." },
             { q: "Is my data private?", a: "100%. Your conversations with Willow, journal entries, and personal data are encrypted and never shared. Your safe space stays safe." },
-          ].map((faq, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100">
+          ].map((faq) => (
+            <div key={faq.q} className="bg-white rounded-2xl p-5 border border-slate-100">
               <h3 className="font-['Outfit'] font-semibold text-slate-900 text-sm mb-1">{faq.q}</h3>
               <p className="text-sm text-slate-600">{faq.a}</p>
             </div>
