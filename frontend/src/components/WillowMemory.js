@@ -99,8 +99,8 @@ function ArrayEditor({ items, onSave, onCancel }) {
 }
 
 // ── Children editor ──
-function ChildrenEditor({ children, onSave, onCancel }) {
-  const [kids, setKids] = useState(children.map(c => ({ ...c })));
+function ChildrenEditor({ kidsList, onSave, onCancel }) {
+  const [kids, setKids] = useState(kidsList.map(c => ({ ...c })));
 
   const updateKid = (idx, field, val) => {
     const updated = [...kids];
@@ -184,6 +184,17 @@ function renderValue(key, value) {
     );
   }
   return <p className="text-sm text-slate-700">{value}</p>;
+}
+
+// ── Route edit to the right editor ──
+function EditSection({ type, value, sectionKey, onSave, onCancel }) {
+  if (type === 'children') {
+    return <ChildrenEditor kidsList={value} onSave={(v) => onSave(sectionKey, v)} onCancel={onCancel} />;
+  }
+  if (type === 'array') {
+    return <ArrayEditor items={value} onSave={(v) => onSave(sectionKey, v)} onCancel={onCancel} />;
+  }
+  return <StringEditor value={value} onSave={(v) => onSave(sectionKey, v)} onCancel={onCancel} />;
 }
 
 // ── Main component ──
@@ -306,13 +317,7 @@ export default function WillowMemory() {
               </div>
 
               {isEditing ? (
-                section.type === 'children' ? (
-                  <ChildrenEditor children={value} onSave={(v) => saveField(section.key, v)} onCancel={() => setEditingKey(null)} />
-                ) : section.type === 'array' ? (
-                  <ArrayEditor items={value} onSave={(v) => saveField(section.key, v)} onCancel={() => setEditingKey(null)} />
-                ) : (
-                  <StringEditor value={value} onSave={(v) => saveField(section.key, v)} onCancel={() => setEditingKey(null)} />
-                )
+                <EditSection type={section.type} value={value} sectionKey={section.key} onSave={saveField} onCancel={() => setEditingKey(null)} />
               ) : (
                 renderValue(section.key, value)
               )}

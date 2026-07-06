@@ -1,4 +1,4 @@
-import random
+import secrets
 import string
 from datetime import datetime, timezone, timedelta
 from database import db
@@ -53,4 +53,5 @@ async def get_daily_chat_count(user_id: str) -> int:
 
 
 def generate_referral_code():
-    return "HEARD" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    alphabet = string.ascii_uppercase + string.digits
+    return "HEARD" + ''.join(secrets.choice(alphabet) for _ in range(6))

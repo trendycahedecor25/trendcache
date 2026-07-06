@@ -31,6 +31,12 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function getTrendStyle(trend) {
+  if (trend === 'improving') return 'bg-[#10B981]/10 text-[#10B981]';
+  if (trend === 'declining') return 'bg-[#4E9FE5]/10 text-[#4E9FE5]';
+  return 'bg-slate-100 text-slate-600';
+}
+
 export default function Dashboard() {
   const { user, checkAuth } = useAuth();
   const navigate = useNavigate();
@@ -298,9 +304,7 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-500">Check-ins</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  moodInsights.trend === 'improving' ? 'bg-[#10B981]/10 text-[#10B981]' :
-                  moodInsights.trend === 'declining' ? 'bg-[#4E9FE5]/10 text-[#4E9FE5]' :
-                  'bg-slate-100 text-slate-600'
+                  getTrendStyle(moodInsights.trend)
                 }`}>
                   {moodInsights.trend}
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Plus, X, Clock, Loader2, Calendar, Trash2 } from 'lucide-react';
 
@@ -39,17 +39,17 @@ export default function CalendarView() {
   const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
   const monthName = new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  useEffect(() => {
-    loadEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonth, currentYear]);
-
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/calendar/events?month=${monthStr}`, { withCredentials: true });
+      const month = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+      const res = await axios.get(`${API}/calendar/events?month=${month}`, { withCredentials: true });
       setEvents(res.data);
     } catch (err) { console.error(err); }
-  };
+  }, [currentMonth, currentYear]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
 
   const addEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.start_time) return;

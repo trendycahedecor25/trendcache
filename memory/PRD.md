@@ -4,52 +4,54 @@
 Web application named "HEARD" designed to support single and unsupported mothers. Core feature is an advanced, empathetic AI companion named "Willow" that listens first and offers tailored solutions.
 
 ## Tech Stack
-- Frontend: React.js, Tailwind CSS, Framer Motion, Web Audio API
+- Frontend: React.js, Tailwind CSS, Framer Motion
 - Backend: FastAPI (modularized), PyMongo (Motor async), Emergentintegrations
 - Auth: Emergent-managed Google Auth (JWT via Cookies + sessionStorage fallback)
 - Payments: Stripe (LIVE key — willowonthewind26@gmail.com account)
 - AI: OpenAI GPT-5.2 (Emergent LLM Key)
 - DB: MongoDB
 
-## Backend Architecture
+## Architecture
 ```
 backend/
-├── server.py          # Entry point (~56 lines)
-├── database.py        # MongoDB client
-├── models.py          # Pydantic models
-├── helpers/
-│   ├── auth.py        # get_current_user, require_admin
-│   ├── subscription.py # subscription helpers
-│   └── willow.py      # System prompt, context builder
-├── routes/
-│   ├── auth.py, chat.py, journal.py, calendar.py, mood.py
-│   ├── subscription.py, referral.py, admin.py, profile.py
-│   ├── calm_corner.py, _calm_data.py
+├── server.py, database.py, models.py
+├── helpers/ (auth.py, subscription.py, willow.py)
+├── routes/ (auth, chat, journal, calendar, mood, subscription, referral, admin, profile, calm_corner, _calm_data)
+frontend/src/
+├── components/
+│   ├── ActivityDetail.js      # Extracted from CalmCorner
+│   ├── BoxBreathingGuide.js   # Extracted from CalmCorner
+│   ├── CalmCorner.js          # Now imports above two
+│   ├── ColoringCanvas.js      # Uses utils/floodFill.js
+│   ├── ASMRPlayer.js          # Nature sounds (real creek audio)
+│   └── ... (Dashboard, WillowChat, WillowMemory, etc.)
+├── utils/
+│   └── floodFill.js           # Extracted from ColoringCanvas
+├── contexts/AuthContext.js
+└── config/api.js
 ```
 
 ## What's Been Implemented
 - Full-stack app with Google Auth, Dashboard, Mood Tracking, Journal (AI prompts), Calendar
-- Willow AI companion with persistent memory, profile extraction, Calm Corner toolkit
-- Editable "What Willow Knows About Me" card (ChatGPT-style memory editing)
-- Calm Corner: 13 micro-mindfulness activities
-- Nature Sounds player: 5 real creek recordings from user's personal videos
-- Coloring Canvas: 9 custom pages, 18 custom colors, full-screen on mobile, recoloring + eraser
-- Stripe subscriptions (LIVE key) with checkout and webhooks
-- Referral program, Admin analytics dashboard (aggregation pipelines)
-- Legal pages, Security fixes (cryptographic admin secret, sessionStorage for tokens)
-- Mobile fixes: scrollable bottom nav (accounts for Emergent badge), full-screen coloring canvas
-- Two rounds of code review fixes applied (hooks, array keys, error handlers, complexity)
+- Willow AI companion with persistent memory, profile extraction
+- Editable "What Willow Knows About Me" card
+- Calm Corner: 13 activities, Nature Sounds (5 real creek recordings), Coloring Canvas (9 pages, 18 colors, full-screen, eraser)
+- Stripe subscriptions (LIVE), Referral program, Admin dashboard
+- Two rounds of code review fixes applied
+
+## Code Review Fixes (Round 2 - Latest)
+- **Security**: Replaced `random.choices` with `secrets.choice` in referral code generation
+- **Complexity**: Extracted `BoxBreathingGuide` and `ActivityDetail` from CalmCorner (329→160 lines), extracted `floodFill` into `utils/floodFill.js`
+- **Hook deps**: Wrapped CalendarView `loadEvents` in `useCallback`, removed eslint-disable comment
+- **Nested ternaries**: Extracted `EditSection` helper in WillowMemory, `getTrendStyle` in Dashboard
+- **Lint fix**: Renamed `children` prop to `kidsList` in ChildrenEditor (React reserved prop)
+- **Python `is None`**: Confirmed correct per PEP 8 (singleton identity check)
+- **SessionStorage**: Designed architecture (cookies primary, sessionStorage fallback) — no change needed
+- **Test hardcoded secret**: Token is generated dynamically via `secrets.token_urlsafe()` at runtime — not a real hardcoded secret
 
 ## Admin
-- Email: tucksmom0527@gmail.com (is_admin: true on both preview and production)
+- Email: tucksmom0527@gmail.com (is_admin: true)
 - Production URL: https://willowhears.me
-
-## Code Review Fixes Applied (Latest)
-- Fixed React hook dependency ordering (sendMessage useCallback defined before useEffect that references it)
-- Replaced all index-as-key with stable keys (WillowChat, WillowMemory, ReferralSection, PricingPage, AdminDashboard, CalmCorner)
-- Added error logging to all empty catch blocks (AuthContext, ReferralSection)
-- Added useCallback import to WillowChat
-- Python `is None` checks confirmed correct per PEP 8 (singleton comparison)
 
 ## Backlog
 ### P1
